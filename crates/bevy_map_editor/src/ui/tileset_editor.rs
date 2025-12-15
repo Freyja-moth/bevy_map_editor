@@ -205,7 +205,14 @@ fn corner_fill_tl(rect: egui::Rect, d: f32, segments: usize) -> Vec<Pos2> {
     let mut pts = vec![tl, Pos2::new(tl.x + 2.0 * d, tl.y)];
     // Arc from (tl.x + 2d, tl.y) curving inward to (tl.x, tl.y + 2d)
     // Arc center at (tl.x + 2d, tl.y + 2d), radius 2d, from -PI/2 to -PI
-    pts.extend(arc_points(tl.x + 2.0 * d, tl.y + 2.0 * d, 2.0 * d, -PI / 2.0, -PI, segments));
+    pts.extend(arc_points(
+        tl.x + 2.0 * d,
+        tl.y + 2.0 * d,
+        2.0 * d,
+        -PI / 2.0,
+        -PI,
+        segments,
+    ));
     pts.push(Pos2::new(tl.x, tl.y + 2.0 * d));
     pts
 }
@@ -216,7 +223,14 @@ fn corner_fill_tr(rect: egui::Rect, d: f32, segments: usize) -> Vec<Pos2> {
     let mut pts = vec![tr, Pos2::new(tr.x, tr.y + 2.0 * d)];
     // Arc from (tr.x, tr.y + 2d) curving inward to (tr.x - 2d, tr.y)
     // Arc center at (tr.x - 2d, tr.y + 2d), radius 2d, from 0 to -PI/2
-    pts.extend(arc_points(tr.x - 2.0 * d, tr.y + 2.0 * d, 2.0 * d, 0.0, -PI / 2.0, segments));
+    pts.extend(arc_points(
+        tr.x - 2.0 * d,
+        tr.y + 2.0 * d,
+        2.0 * d,
+        0.0,
+        -PI / 2.0,
+        segments,
+    ));
     pts.push(Pos2::new(tr.x - 2.0 * d, tr.y));
     pts
 }
@@ -227,7 +241,14 @@ fn corner_fill_bl(rect: egui::Rect, d: f32, segments: usize) -> Vec<Pos2> {
     let mut pts = vec![bl, Pos2::new(bl.x, bl.y - 2.0 * d)];
     // Arc from (bl.x, bl.y - 2d) curving inward to (bl.x + 2d, bl.y)
     // Arc center at (bl.x + 2d, bl.y - 2d), radius 2d, from PI to PI/2
-    pts.extend(arc_points(bl.x + 2.0 * d, bl.y - 2.0 * d, 2.0 * d, PI, PI / 2.0, segments));
+    pts.extend(arc_points(
+        bl.x + 2.0 * d,
+        bl.y - 2.0 * d,
+        2.0 * d,
+        PI,
+        PI / 2.0,
+        segments,
+    ));
     pts.push(Pos2::new(bl.x + 2.0 * d, bl.y));
     pts
 }
@@ -238,7 +259,14 @@ fn corner_fill_br(rect: egui::Rect, d: f32, segments: usize) -> Vec<Pos2> {
     let mut pts = vec![br, Pos2::new(br.x - 2.0 * d, br.y)];
     // Arc from (br.x - 2d, br.y) curving inward to (br.x, br.y - 2d)
     // Arc center at (br.x - 2d, br.y - 2d), radius 2d, from PI/2 to 0
-    pts.extend(arc_points(br.x - 2.0 * d, br.y - 2.0 * d, 2.0 * d, PI / 2.0, 0.0, segments));
+    pts.extend(arc_points(
+        br.x - 2.0 * d,
+        br.y - 2.0 * d,
+        2.0 * d,
+        PI / 2.0,
+        0.0,
+        segments,
+    ));
     pts.push(Pos2::new(br.x, br.y - 2.0 * d));
     pts
 }
@@ -278,7 +306,14 @@ fn edge_strip_top(rect: egui::Rect, d: f32, segments: usize) -> Vec<Pos2> {
     // Go back left along bottom
     pts.push(Pos2::new(left, top + 2.0 * d));
     // Arc at left end (semicircle going up and back)
-    pts.extend(arc_points(left, top + d, d, PI / 2.0, 3.0 * PI / 2.0, segments));
+    pts.extend(arc_points(
+        left,
+        top + d,
+        d,
+        PI / 2.0,
+        3.0 * PI / 2.0,
+        segments,
+    ));
     pts
 }
 
@@ -309,10 +344,24 @@ fn edge_strip_bottom(rect: egui::Rect, d: f32, segments: usize) -> Vec<Pos2> {
     pts.push(Pos2::new(left, bottom));
     pts.push(Pos2::new(right, bottom));
     // Arc at right end (semicircle going up and back)
-    pts.extend(arc_points(right, bottom - d, d, PI / 2.0, -PI / 2.0, segments));
+    pts.extend(arc_points(
+        right,
+        bottom - d,
+        d,
+        PI / 2.0,
+        -PI / 2.0,
+        segments,
+    ));
     pts.push(Pos2::new(left, bottom - 2.0 * d));
     // Arc at left end (semicircle going down and back)
-    pts.extend(arc_points(left, bottom - d, d, -PI / 2.0, -3.0 * PI / 2.0, segments));
+    pts.extend(arc_points(
+        left,
+        bottom - d,
+        d,
+        -PI / 2.0,
+        -3.0 * PI / 2.0,
+        segments,
+    ));
     pts
 }
 
@@ -564,105 +613,107 @@ fn render_terrain_sets_tab(
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(&mut columns[0], |ui| {
-            ui.heading("Terrain Sets");
+                ui.heading("Terrain Sets");
 
-            // List terrain sets for this tileset
-            let terrain_sets: Vec<_> = project
-                .autotile_config
-                .terrain_sets
-                .iter()
-                .filter(|ts| ts.tileset_id == tileset_id)
-                .map(|ts| (ts.id, ts.name.clone(), ts.set_type, ts.terrains.len()))
-                .collect();
+                // List terrain sets for this tileset
+                let terrain_sets: Vec<_> = project
+                    .autotile_config
+                    .terrain_sets
+                    .iter()
+                    .filter(|ts| ts.tileset_id == tileset_id)
+                    .map(|ts| (ts.id, ts.name.clone(), ts.set_type, ts.terrains.len()))
+                    .collect();
 
-            for (ts_id, name, set_type, terrain_count) in &terrain_sets {
-                ui.horizontal(|ui| {
-                    let selected = editor_state.selected_terrain_set == Some(*ts_id);
-                    if ui.selectable_label(selected, name).clicked() {
-                        editor_state.selected_terrain_set = Some(*ts_id);
-                        editor_state
-                            .tileset_editor_state
-                            .selected_terrain_for_assignment = None;
-                    }
-                    ui.small(format!("{:?} ({})", set_type, terrain_count));
-                });
-            }
-
-            ui.separator();
-
-            ui.horizontal(|ui| {
-                if ui.button("+ New Set").clicked() {
-                    editor_state.show_new_terrain_set_dialog = true;
+                for (ts_id, name, set_type, terrain_count) in &terrain_sets {
+                    ui.horizontal(|ui| {
+                        let selected = editor_state.selected_terrain_set == Some(*ts_id);
+                        if ui.selectable_label(selected, name).clicked() {
+                            editor_state.selected_terrain_set = Some(*ts_id);
+                            editor_state
+                                .tileset_editor_state
+                                .selected_terrain_for_assignment = None;
+                        }
+                        ui.small(format!("{:?} ({})", set_type, terrain_count));
+                    });
                 }
-            });
 
-            // If a terrain set is selected, show its terrains
-            if let Some(ts_id) = editor_state.selected_terrain_set {
-                if let Some(terrain_set) = project.autotile_config.get_terrain_set(ts_id) {
-                    ui.separator();
-                    ui.heading("Terrains");
+                ui.separator();
 
-                    // Terrain list with selection
-                    for (idx, terrain) in terrain_set.terrains.iter().enumerate() {
+                ui.horizontal(|ui| {
+                    if ui.button("+ New Set").clicked() {
+                        editor_state.show_new_terrain_set_dialog = true;
+                    }
+                });
+
+                // If a terrain set is selected, show its terrains
+                if let Some(ts_id) = editor_state.selected_terrain_set {
+                    if let Some(terrain_set) = project.autotile_config.get_terrain_set(ts_id) {
+                        ui.separator();
+                        ui.heading("Terrains");
+
+                        // Terrain list with selection
+                        for (idx, terrain) in terrain_set.terrains.iter().enumerate() {
+                            ui.horizontal(|ui| {
+                                let color = terrain_color_to_egui(&terrain.color);
+                                let selected = editor_state
+                                    .tileset_editor_state
+                                    .selected_terrain_for_assignment
+                                    == Some(idx);
+
+                                // Color swatch
+                                let (rect, _) = ui.allocate_exact_size(
+                                    egui::vec2(16.0, 16.0),
+                                    egui::Sense::hover(),
+                                );
+                                ui.painter().rect_filled(rect, 2.0, color);
+
+                                // Terrain name with selection
+                                if ui.selectable_label(selected, &terrain.name).clicked() {
+                                    editor_state
+                                        .tileset_editor_state
+                                        .selected_terrain_for_assignment = Some(idx);
+                                }
+                            });
+                        }
+
+                        // Buttons
+                        ui.separator();
                         ui.horizontal(|ui| {
-                            let color = terrain_color_to_egui(&terrain.color);
-                            let selected = editor_state
+                            if ui.button("+ Add Terrain").clicked() {
+                                editor_state.show_add_terrain_to_set_dialog = true;
+                            }
+                            if editor_state
                                 .tileset_editor_state
                                 .selected_terrain_for_assignment
-                                == Some(idx);
-
-                            // Color swatch
-                            let (rect, _) = ui
-                                .allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
-                            ui.painter().rect_filled(rect, 2.0, color);
-
-                            // Terrain name with selection
-                            if ui.selectable_label(selected, &terrain.name).clicked() {
-                                editor_state
-                                    .tileset_editor_state
-                                    .selected_terrain_for_assignment = Some(idx);
+                                .is_some()
+                            {
+                                if ui.button("Clear Selection").clicked() {
+                                    editor_state
+                                        .tileset_editor_state
+                                        .selected_terrain_for_assignment = None;
+                                }
                             }
                         });
-                    }
 
-                    // Buttons
-                    ui.separator();
-                    ui.horizontal(|ui| {
-                        if ui.button("+ Add Terrain").clicked() {
-                            editor_state.show_add_terrain_to_set_dialog = true;
-                        }
-                        if editor_state
-                            .tileset_editor_state
-                            .selected_terrain_for_assignment
-                            .is_some()
-                        {
-                            if ui.button("Clear Selection").clicked() {
-                                editor_state
-                                    .tileset_editor_state
-                                    .selected_terrain_for_assignment = None;
+                        // Instructions based on terrain set type
+                        ui.separator();
+                        ui.small("Click on tile corners/edges to paint terrain.");
+                        ui.small("Ctrl+click to clear a position.");
+                        ui.add_space(4.0);
+                        match terrain_set.set_type {
+                            TerrainSetType::Corner => {
+                                ui.small("Corner mode: 4 zones per tile (corners)");
                             }
-                        }
-                    });
-
-                    // Instructions based on terrain set type
-                    ui.separator();
-                    ui.small("Click on tile corners/edges to paint terrain.");
-                    ui.small("Ctrl+click to clear a position.");
-                    ui.add_space(4.0);
-                    match terrain_set.set_type {
-                        TerrainSetType::Corner => {
-                            ui.small("Corner mode: 4 zones per tile (corners)");
-                        }
-                        TerrainSetType::Edge => {
-                            ui.small("Edge mode: 4 zones per tile (edges)");
-                        }
-                        TerrainSetType::Mixed => {
-                            ui.small("Mixed mode: 8 zones per tile");
+                            TerrainSetType::Edge => {
+                                ui.small("Edge mode: 4 zones per tile (edges)");
+                            }
+                            TerrainSetType::Mixed => {
+                                ui.small("Mixed mode: 8 zones per tile");
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
 
         // Right column: Tileset preview with terrain overlays
         columns[1].vertical(|ui| {
@@ -775,14 +826,9 @@ fn render_tileset_with_terrain_overlay(
                     let virtual_index = image_virtual_offset + local_index;
 
                     // Calculate tile rect (accounting for spacing)
-                    let tile_x =
-                        grid_origin.x + col as f32 * (tile_display_size + spacing);
-                    let tile_y =
-                        grid_origin.y + row as f32 * (tile_display_size + spacing);
-                    let rect = egui::Rect::from_min_size(
-                        egui::pos2(tile_x, tile_y),
-                        display_size,
-                    );
+                    let tile_x = grid_origin.x + col as f32 * (tile_display_size + spacing);
+                    let tile_y = grid_origin.y + row as f32 * (tile_display_size + spacing);
+                    let rect = egui::Rect::from_min_size(egui::pos2(tile_x, tile_y), display_size);
 
                     // Draw tile texture
                     if let Some(tex_id) = texture_id {
@@ -861,7 +907,8 @@ fn render_tileset_with_terrain_overlay(
                     let col = (rel_x / effective_tile_size).floor() as i32;
                     let row = (rel_y / effective_tile_size).floor() as i32;
 
-                    if col < 0 || col >= image.columns as i32 || row < 0 || row >= image.rows as i32 {
+                    if col < 0 || col >= image.columns as i32 || row < 0 || row >= image.rows as i32
+                    {
                         return None;
                     }
 
@@ -891,7 +938,9 @@ fn render_tileset_with_terrain_overlay(
 
                 // Draw hover highlight on the zone under cursor
                 if let Some(hover_pos) = ui.input(|i| i.pointer.hover_pos()) {
-                    if let Some((tile_index, local_x, local_y, tile_rect)) = get_tile_and_local(hover_pos) {
+                    if let Some((tile_index, local_x, local_y, tile_rect)) =
+                        get_tile_and_local(hover_pos)
+                    {
                         if let Some(position) = get_tile_zone(local_x, local_y, st) {
                             // Draw hover highlight
                             draw_zone_hover_highlight(ui.painter(), tile_rect, position, st);
@@ -936,7 +985,9 @@ fn render_tileset_with_terrain_overlay(
                 // Handle clicks - paint to single tile's zone
                 if grid_response.clicked() || grid_response.dragged() {
                     if let Some(click_pos) = grid_response.interact_pointer_pos() {
-                        if let Some((tile_index, local_x, local_y, _tile_rect)) = get_tile_and_local(click_pos) {
+                        if let Some((tile_index, local_x, local_y, _tile_rect)) =
+                            get_tile_and_local(click_pos)
+                        {
                             if let Some(position) = get_tile_zone(local_x, local_y, st) {
                                 let ctrl_held = ui.input(|i| i.modifiers.ctrl);
                                 let terrain_idx = if ctrl_held {

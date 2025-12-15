@@ -9,6 +9,7 @@ mod entity_palette;
 mod inspector;
 mod menu_bar;
 mod schema_editor;
+mod spritesheet_editor;
 mod terrain;
 mod terrain_palette;
 mod tileset;
@@ -16,13 +17,16 @@ mod tileset_editor;
 mod toolbar;
 mod tree_view;
 
-pub use animation_editor::{render_animation_editor, AnimationEditorResult, SpriteEditorState};
+pub use animation_editor::{render_animation_editor, AnimationEditorResult, AnimationEditorState};
 pub use dialogs::*;
 pub use dialogue_editor::{render_dialogue_editor, DialogueEditorResult, DialogueEditorState};
 pub use entity_palette::{render_entity_palette, EntityPaintState};
 pub use inspector::{get_default_value, render_inspector, InspectorResult, Selection};
 pub use menu_bar::*;
 pub use schema_editor::{render_schema_editor, SchemaEditorState};
+pub use spritesheet_editor::{
+    render_spritesheet_editor, SpriteSheetEditorResult, SpriteSheetEditorState,
+};
 pub use terrain_palette::{render_terrain_palette, TerrainPaintState};
 pub use tileset::{render_tileset_palette, render_tileset_palette_with_cache};
 pub use tileset_editor::{render_tileset_editor, TilesetEditorState};
@@ -252,7 +256,7 @@ fn load_tileset_textures(
     }
 }
 
-/// System to load animation editor spritesheet textures and register them with egui
+/// System to load spritesheet textures for both SpriteSheet Editor and Animation Editor
 fn load_spritesheet_textures(
     mut editor_state: ResMut<EditorState>,
     mut cache: ResMut<SpritesheetTextureCache>,
@@ -260,65 +264,104 @@ fn load_spritesheet_textures(
     asset_server: Res<AssetServer>,
     images: Res<Assets<Image>>,
 ) {
-    // Only process if sprite sheet editor is open and needs texture load
-    if !editor_state.show_sprite_sheet_editor
-        || !editor_state.sprite_sheet_editor_state.needs_texture_load()
+    // Collect paths that need loading from both editors
+    let mut paths_to_check: Vec<(String, bool, bool)> = Vec::new();
+
+    // SpriteSheet Editor needs texture?
+    if editor_state.show_spritesheet_editor
+        && editor_state.spritesheet_editor_state.needs_texture_load()
     {
-        return;
-    }
-
-    let sheet_path = editor_state
-        .sprite_sheet_editor_state
-        .sprite_data
-        .sheet_path
-        .clone();
-    if sheet_path.is_empty() {
-        return;
-    }
-
-    // Check if already loaded
-    if let Some((_, texture_id, width, height)) = cache.loaded.get(&sheet_path) {
-        // Already loaded, just update the state
-        editor_state
-            .sprite_sheet_editor_state
-            .set_texture(*texture_id, *width, *height);
-        return;
-    }
-
-    // Check if load is pending
-    if let Some(handle) = cache.pending.get(&sheet_path).cloned() {
-        // Check if the image has finished loading
-        if let Some(image) = images.get(&handle) {
-            let width = image.width() as f32;
-            let height = image.height() as f32;
-
-            debug!(
-                "Spritesheet loaded: {} -> {}x{} px",
-                sheet_path, width as u32, height as u32
-            );
-
-            // Register with egui
-            let texture_id = contexts.add_image(EguiTextureHandle::Strong(handle.clone()));
-
-            // Cache the result
-            cache.loaded.insert(
-                sheet_path.clone(),
-                (handle.clone(), texture_id, width, height),
-            );
-            cache.pending.remove(&sheet_path);
-
-            // Update sprite sheet editor state
-            editor_state
-                .sprite_sheet_editor_state
-                .set_texture(texture_id, width, height);
+        let path = editor_state
+            .spritesheet_editor_state
+            .sprite_data
+            .sheet_path
+            .clone();
+        if !path.is_empty() {
+            paths_to_check.push((path, true, false));
         }
-        return;
     }
 
-    // Start loading the image (path should be relative to assets directory)
-    debug!("Loading spritesheet: {}", sheet_path);
-    let handle: Handle<Image> = asset_server.load(&sheet_path);
-    cache.pending.insert(sheet_path, handle);
+    // Animation Editor needs texture?
+    if editor_state.show_animation_editor
+        && editor_state.animation_editor_state.needs_texture_load()
+    {
+        let path = editor_state
+            .animation_editor_state
+            .sprite_data
+            .sheet_path
+            .clone();
+        if !path.is_empty() {
+            // Check if we already have this path from spritesheet editor
+            if !paths_to_check.iter().any(|(p, _, _)| p == &path) {
+                paths_to_check.push((path, false, true));
+            } else {
+                // Mark that animation editor also needs this path
+                if let Some((_, _, anim)) = paths_to_check.iter_mut().find(|(p, _, _)| p == &path) {
+                    *anim = true;
+                }
+            }
+        }
+    }
+
+    for (sheet_path, for_spritesheet_editor, for_animation_editor) in paths_to_check {
+        // Check if already loaded
+        if let Some((_, texture_id, width, height)) = cache.loaded.get(&sheet_path) {
+            // Already loaded, update the appropriate editor state(s)
+            if for_spritesheet_editor {
+                editor_state
+                    .spritesheet_editor_state
+                    .set_texture(*texture_id, *width, *height);
+            }
+            if for_animation_editor {
+                editor_state
+                    .animation_editor_state
+                    .set_texture(*texture_id, *width, *height);
+            }
+            continue;
+        }
+
+        // Check if load is pending
+        if let Some(handle) = cache.pending.get(&sheet_path).cloned() {
+            // Check if the image has finished loading
+            if let Some(image) = images.get(&handle) {
+                let width = image.width() as f32;
+                let height = image.height() as f32;
+
+                debug!(
+                    "Spritesheet loaded: {} -> {}x{} px",
+                    sheet_path, width as u32, height as u32
+                );
+
+                // Register with egui
+                let texture_id = contexts.add_image(EguiTextureHandle::Strong(handle.clone()));
+
+                // Cache the result
+                cache.loaded.insert(
+                    sheet_path.clone(),
+                    (handle.clone(), texture_id, width, height),
+                );
+                cache.pending.remove(&sheet_path);
+
+                // Update editor state(s)
+                if for_spritesheet_editor {
+                    editor_state
+                        .spritesheet_editor_state
+                        .set_texture(texture_id, width, height);
+                }
+                if for_animation_editor {
+                    editor_state
+                        .animation_editor_state
+                        .set_texture(texture_id, width, height);
+                }
+            }
+            continue;
+        }
+
+        // Start loading the image (path should be relative to assets directory)
+        debug!("Loading spritesheet: {}", sheet_path);
+        let handle: Handle<Image> = asset_server.load(&sheet_path);
+        cache.pending.insert(sheet_path, handle);
+    }
 }
 
 /// Main UI rendering system
@@ -923,15 +966,27 @@ fn render_ui(
         editor_state.selection = Selection::SpriteSheet(id);
     }
 
+    // Handle opening Animation Editor for sprite sheets
     if let Some(id) = tree_view_result
         .edit_sprite_sheet
         .or(inspector_result.edit_sprite_sheet)
     {
         if let Some(sprite_sheet) = project.get_sprite_sheet(id) {
-            editor_state.sprite_sheet_editor_state =
-                SpriteEditorState::from_sprite_data(sprite_sheet.clone());
-            editor_state.sprite_sheet_editor_asset_id = Some(id);
-            editor_state.show_sprite_sheet_editor = true;
+            editor_state.animation_editor_state =
+                AnimationEditorState::from_sprite_data(sprite_sheet.clone(), id);
+            editor_state.show_animation_editor = true;
+        }
+    }
+
+    // Handle opening SpriteSheet Editor (for grid setup)
+    if let Some(id) = tree_view_result
+        .edit_sprite_sheet_settings
+        .or(inspector_result.edit_sprite_sheet_settings)
+    {
+        if let Some(sprite_sheet) = project.get_sprite_sheet(id) {
+            editor_state.spritesheet_editor_state =
+                SpriteSheetEditorState::from_sprite_data(sprite_sheet.clone(), id);
+            editor_state.show_spritesheet_editor = true;
         }
     }
 
@@ -1012,26 +1067,69 @@ fn render_ui(
     // Tileset & Terrain Editor (modal window)
     render_tileset_editor(ctx, &mut editor_state, &mut project, Some(&tileset_cache));
 
-    // Sprite Sheet Editor (modal window)
-    if editor_state.show_sprite_sheet_editor {
-        let result = render_animation_editor(ctx, &mut editor_state.sprite_sheet_editor_state);
+    // SpriteSheet Editor (modal window) - for spritesheet setup
+    if editor_state.show_spritesheet_editor {
+        let result = render_spritesheet_editor(ctx, &mut editor_state.spritesheet_editor_state);
         if result.close {
-            editor_state.show_sprite_sheet_editor = false;
-            editor_state.sprite_sheet_editor_asset_id = None;
+            editor_state.show_spritesheet_editor = false;
         }
-        // Save sprite data back when changed
+        // Save sprite data back when changed (only grid config)
         if result.changed {
-            let sprite_data = editor_state.sprite_sheet_editor_state.get_sprite_data();
+            let sprite_data = editor_state.spritesheet_editor_state.get_sprite_data();
 
-            // Check if editing a project-level asset
-            if let Some(asset_id) = editor_state.sprite_sheet_editor_asset_id {
-                // Save back to project.sprite_sheets
+            if let Some(asset_id) = editor_state.spritesheet_editor_state.asset_id {
+                // Save grid config back to project.sprite_sheets
                 if let Some(sprite_sheet) = project.get_sprite_sheet_mut(asset_id) {
-                    *sprite_sheet = sprite_data;
+                    sprite_sheet.sheet_path = sprite_data.sheet_path.clone();
+                    sprite_sheet.frame_width = sprite_data.frame_width;
+                    sprite_sheet.frame_height = sprite_data.frame_height;
+                    sprite_sheet.columns = sprite_data.columns;
+                    sprite_sheet.rows = sprite_data.rows;
+                    sprite_sheet.pivot_x = sprite_data.pivot_x;
+                    sprite_sheet.pivot_y = sprite_data.pivot_y;
+                    sprite_sheet.name = sprite_data.name.clone();
                 }
-            } else if let Some(instance_id) = editor_state.sprite_sheet_editor_state.instance_id {
+
+                // Synchronize with Animation Editor if open with same asset
+                if editor_state.show_animation_editor
+                    && editor_state.animation_editor_state.asset_id == Some(asset_id)
+                {
+                    editor_state
+                        .animation_editor_state
+                        .refresh_grid_config(&sprite_data);
+                }
+            }
+        }
+        // Handle browse button click
+        if result.browse_spritesheet {
+            if let Some(path) = crate::ui::spritesheet_editor::open_spritesheet_dialog() {
+                let relative_path = assets_base_path.to_relative(std::path::Path::new(&path));
+                let relative_path_str = relative_path.to_string_lossy().to_string();
+                editor_state.spritesheet_editor_state.sheet_path_input = relative_path_str.clone();
+                editor_state.spritesheet_editor_state.sprite_data.sheet_path = relative_path_str;
+                editor_state.spritesheet_editor_state.clear_texture();
+            }
+        }
+    }
+
+    // Animation Editor (modal window) - for animation definition
+    if editor_state.show_animation_editor {
+        let result = render_animation_editor(ctx, &mut editor_state.animation_editor_state);
+        if result.close {
+            editor_state.show_animation_editor = false;
+        }
+        // Save animations back when changed
+        if result.changed {
+            let sprite_data = editor_state.animation_editor_state.get_sprite_data();
+
+            if let Some(asset_id) = editor_state.animation_editor_state.asset_id {
+                // Save animations back to project.sprite_sheets
+                if let Some(sprite_sheet) = project.get_sprite_sheet_mut(asset_id) {
+                    sprite_sheet.animations = sprite_data.animations;
+                }
+            } else if let Some(instance_id) = editor_state.animation_editor_state.instance_id {
                 // Save back to data instance property (inline editing)
-                let property_name = editor_state.sprite_sheet_editor_state.property_name.clone();
+                let property_name = editor_state.animation_editor_state.property_name.clone();
                 if let Ok(json_value) = serde_json::to_value(&sprite_data) {
                     let value = bevy_map_core::Value::from_json(json_value);
                     if let Some(instance) = project.get_data_instance_mut(instance_id) {
@@ -1040,18 +1138,14 @@ fn render_ui(
                 }
             }
         }
-        // Handle browse button click
-        if result.browse_spritesheet {
-            if let Some(path) = crate::ui::animation_editor::open_spritesheet_dialog() {
-                // Convert absolute path to relative path (relative to assets directory)
-                let relative_path = assets_base_path.to_relative(std::path::Path::new(&path));
-                let relative_path_str = relative_path.to_string_lossy().to_string();
-                editor_state.sprite_sheet_editor_state.sheet_path_input = relative_path_str.clone();
-                editor_state
-                    .sprite_sheet_editor_state
-                    .sprite_data
-                    .sheet_path = relative_path_str;
-                editor_state.sprite_sheet_editor_state.clear_texture();
+        // Handle request to open SpriteSheet Editor
+        if result.open_spritesheet_editor {
+            if let Some(asset_id) = editor_state.animation_editor_state.asset_id {
+                if let Some(sprite_sheet) = project.get_sprite_sheet(asset_id) {
+                    editor_state.spritesheet_editor_state =
+                        SpriteSheetEditorState::from_sprite_data(sprite_sheet.clone(), asset_id);
+                    editor_state.show_spritesheet_editor = true;
+                }
             }
         }
     }

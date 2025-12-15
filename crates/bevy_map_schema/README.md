@@ -14,14 +14,14 @@ Part of [bevy_map_editor](https://github.com/jbuehler23/bevy_map_editor).
 
 ## Property Types
 
-| Type | Description |
-|------|-------------|
-| `string` | Text value |
-| `int` | Integer number |
-| `float` | Decimal number |
-| `bool` | True/false |
-| `color` | Hex color (#RRGGBB) |
-| `enum` | Custom enum type |
+| Type     | Description         |
+|----------|---------------------|
+| `string` | Text value          |
+| `int`    | Integer number      |
+| `float`  | Decimal number      |
+| `bool`   | True/false          |
+| `color`  | Hex color (#RRGGBB) |
+| `enum`   | Custom enum type    |
 
 ## Schema Format
 

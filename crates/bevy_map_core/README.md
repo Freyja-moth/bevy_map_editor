@@ -6,15 +6,15 @@ Part of [bevy_map_editor](https://github.com/jbuehler23/bevy_map_editor).
 
 ## Types
 
-| Type | Description |
-|------|-------------|
-| `MapProject` | Complete project with levels, tilesets, dialogues, animations |
-| `Level` | Single map level with layers and entities |
-| `Layer` | Tile or object layer within a level |
-| `Tileset` | Tileset definition with multi-image support |
-| `TilesetImage` | Individual image within a tileset |
-| `EntityInstance` | Placed entity with position and properties |
-| `Value` | Dynamic property value (String, Int, Float, Bool, Color, etc.) |
+| Type             | Description                                                    |
+|------------------|----------------------------------------------------------------|
+| `MapProject`     | Complete project with levels, tilesets, dialogues, animations  |
+| `Level`          | Single map level with layers and entities                      |
+| `Layer`          | Tile or object layer within a level                            |
+| `Tileset`        | Tileset definition with multi-image support                    |
+| `TilesetImage`   | Individual image within a tileset                              |
+| `EntityInstance` | Placed entity with position and properties                     |
+| `Value`          | Dynamic property value (String, Int, Float, Bool, Color, etc.) |
 
 ## Usage
 

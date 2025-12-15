@@ -38,6 +38,10 @@ path = "animation/auto_demo.rs"
 name = "animation_manual_demo"
 path = "animation/manual_demo.rs"
 
+[[example]]
+name = "animation_triggers_demo"
+path = "animation/triggers_demo.rs"
+
 # Dialogue examples - auto vs manual loading
 [[example]]
 name = "dialogue_auto_demo"

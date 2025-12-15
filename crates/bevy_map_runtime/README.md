@@ -9,7 +9,7 @@ Part of [bevy_map_editor](https://github.com/jbuehler23/bevy_map_editor).
 - Efficient tilemap rendering via bevy_ecs_tilemap 0.17
 - Asset-based map loading with hot reload support
 - Custom entity spawning with `#[derive(MapEntity)]`
-- Auto-loading for animations and dialogues
+- Autoloading for animations and dialogues
 - Runtime tile modification
 
 ## Quick Start
@@ -28,7 +28,7 @@ fn main() {
 
 fn load_map(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn(Camera2d);
-    commands.spawn(MapBundle::new(asset_server.load("maps/level.map.json")));
+    commands.spawn(MapHandle::new(asset_server.load("maps/level.map.json")));
 }
 ```
 
@@ -39,7 +39,7 @@ Register entity types to spawn game objects from map data:
 ```rust
 use bevy::prelude::*;
 use bevy_map_derive::MapEntity;
-use bevy_map_runtime::MapEntityRegistry;
+use bevy_map_runtime::{MapRuntimePlugin, MapEntityExt};
 
 #[derive(Component, MapEntity)]
 #[map_entity(type_name = "Chest")]
@@ -50,14 +50,16 @@ pub struct Chest {
     pub locked: bool,
 }
 
-fn setup(mut registry: ResMut<MapEntityRegistry>) {
-    registry.register::<Chest>();
-}
+// Register in your app builder
+App::new()
+    .add_plugins(MapRuntimePlugin)
+    .register_map_entity::<Chest>()
+    // ... other setup
 ```
 
 ## Auto-Loading Animations
 
-Use `AnimatedSpriteHandle` to auto-load sprite animations from a map project:
+Use `AnimatedSpriteHandle` to autoload sprite animations from a map project:
 
 ```rust
 use bevy_map_runtime::AnimatedSpriteHandle;
@@ -73,7 +75,7 @@ fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 ```
 
-## Auto-Loading Dialogues
+## Autoloading Dialogues
 
 Use `DialogueTreeHandle` to auto-load dialogues:
 

@@ -96,6 +96,15 @@ pub use bevy_map_dialogue::{
     DialogueNodeType, DialogueRunner, DialogueTree, StartDialogueEvent,
 };
 
+// Re-export key animation types for convenience
+pub use bevy_map_animation::{
+    AnimatedSprite, AnimationCustomEvent, AnimationDef, AnimationEventExt,
+    AnimationParticleEvent, AnimationSoundEvent, AnimationTrigger, AnimationTriggerEvent,
+    AnimationTriggerRegistry, AnimationTriggerType, AnimationWindow, AnimationWindowEvent,
+    AnimationWindowRegistry, AnimationWindowType, LoopMode, SpriteAnimationPlugin, SpriteData,
+    TriggerPayload, WindowPhase, WindowTracker,
+};
+
 /// Plugin for runtime map rendering
 ///
 /// This plugin provides:
@@ -109,6 +118,7 @@ impl Plugin for MapRuntimePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(TilemapPlugin)
             .add_plugins(bevy_map_dialogue::DialoguePlugin)
+            .add_plugins(bevy_map_animation::SpriteAnimationPlugin)
             // Asset loading
             .init_asset::<MapProject>()
             .init_asset_loader::<MapProjectLoader>()

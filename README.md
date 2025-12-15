@@ -3,10 +3,9 @@
 A complete 2D tilemap editing ecosystem for Bevy 0.17. Create maps in the editor, load them at runtime with one line of code. For more 
 complex asset loading, you can specify when to load those as well for more control.
 
-<!-- TODO: Add editor screenshot here -->
 ![Editor Screenshot](docs/images/editor_screenshot.png)
 
-## Features
+## Headline
 
 - **Visual Map Editor** - egui-based editor with layer system, terrain painting, and entity placement
 - **Autotiling** - Corner, Edge, and Mixed terrain modes using Wang tiles, currently WIP
@@ -15,6 +14,47 @@ complex asset loading, you can specify when to load those as well for more contr
 - **Sprite Animations** - Define sprite sheets with named animations, autoloaded at runtime
 - **Dialogue Trees** - Visual node-based dialogue editor with branching conversations
 - **Schema System** - Type-safe entity properties with validation
+
+## Editor Features
+
+<!-- TODO: Add feature screenshots here -->
+
+### Terrain Painting
+Autotile terrain transitions using Wang tiles (Corner, Edge, Mixed modes). This is heavily inspired by [](https://github.com/mapeditor/tiled)
+and credit to @bjorn for helping me with the Tiled autotiling algorithm!
+
+Autotiling is still a WIP while I get the algorithm right, but you can manually paint Tiles in the map currently.
+
+Here's the Tileset Editor:
+![Tileset Editor/Terrain](docs/images/tileset_editor.png)
+
+The below video shows some of the issues currently with autotiling, while I work on fixing them!
+
+![Autotiling](docs/videos/autotiling.mp4)
+
+### Entity Placement
+Place custom entities with property editing in the inspector panel. As well as define custom Data Types for those entities.
+
+![Entity Screenshot](docs/images/entity_editor.png)
+
+Demo of how easy it is to place/create Custom entities:
+
+![Entity Placement Demo](docs/videos/entities.mp4)
+
+### Dialogue Editor
+Visual node-based dialogue tree editor with Text, Choice, Condition, and Action nodes. See [example](examples/dialogue/auto_demo.rs)
+
+![Dialogue Editor](docs/images/dialogue_editor.png)
+
+### Spritesheet Editor
+Define sprite sheets with multiple named animations per asset. See [example](examples/animation/auto_demo.rs).
+Load these spritesheets into animations, and use the Animation Editor for animation timelines/dopesheets!
+
+Spritesheet loading:
+![Spritesheet Editor](docs/images/spritesheet_editor.png)
+
+Animation Timeline with Trigger/Window events:
+![Animation Editor](docs/videos/animation_editor.mp4)
 
 ## Crates
 
@@ -31,7 +71,17 @@ complex asset loading, you can specify when to load those as well for more contr
 
 ## Quick Start
 
-### Running the Editor
+### Install the Editor (Standalone Binary)
+
+```bash
+# From crates.io
+cargo install bevy_map_editor
+
+# Run the editor
+bevy_map_editor
+```
+
+### Embed in Your Project
 
 ```rust
 use bevy::prelude::*;
@@ -44,6 +94,8 @@ fn main() {
         .run();
 }
 ```
+
+Or run the example:
 
 ```bash
 cargo run --example basic_editor -p bevy_map_editor_examples
@@ -83,7 +135,7 @@ Define game entities in code, place them in the editor:
 ```rust
 use bevy::prelude::*;
 use bevy_map_derive::MapEntity;
-use bevy_map_runtime::MapEntityRegistry;
+use bevy_map_runtime::{MapRuntimePlugin, MapEntityExt};
 
 #[derive(Component, MapEntity)]
 #[map_entity(type_name = "NPC")]
@@ -149,32 +201,7 @@ Maps are saved as `.map.json` files [see example full-project JSON](examples/ass
 }
 ```
 
-## Editor Features
 
-<!-- TODO: Add feature screenshots here -->
-
-### Terrain Painting
-Autotile terrain transitions using Wang tiles (Corner, Edge, Mixed modes). This is heavily inspired by [](https://github.com/mapeditor/tiled)
-and credit to @bjorn for helping me with the Tiled autotiling algorithm!
-
-Autotiling is still a WIP while I get the algorithm right, but you can manually paint Tiles in the map currently.
-
-![Terrain Painting](docs/images/terrain_painting.png)
-
-### Entity Placement
-Place custom entities with property editing in the inspector panel. As well as define custom Data Types for those entities.
-
-![Entity Placement](docs/images/entity_placement.png)
-
-### Dialogue Editor
-Visual node-based dialogue tree editor with Text, Choice, Condition, and Action nodes. See [example](examples/dialogue/auto_demo.rs)
-
-![Dialogue Editor](docs/images/dialogue_editor.png)
-
-### Animation Editor
-Define sprite sheets with multiple named animations per asset. See [example](examples/animation/auto_demo.rs).
-
-![Animation Editor](docs/images/animation_editor.png)
 
 ## Keyboard Shortcuts
 

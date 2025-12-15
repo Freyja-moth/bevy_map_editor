@@ -1,6 +1,6 @@
 # bevy_map_autotile
 
-Tiled-compatible terrain autotiling using Wang tiles.
+Tiled-like terrain autotiling using Wang tiles.
 
 Part of [bevy_map_editor](https://github.com/jbuehler23/bevy_map_editor).
 
@@ -9,15 +9,15 @@ Part of [bevy_map_editor](https://github.com/jbuehler23/bevy_map_editor).
 - **Corner Mode** - 16-tile terrains for smooth ground transitions
 - **Edge Mode** - 16-tile terrains for linear features (walls, paths)
 - **Mixed Mode** - 48-tile terrains for full coverage
-- Compatible with Tiled's Wang tile system
+- Similar to Tiled's Wang tile system
 
 ## Terrain Set Types
 
-| Type | Tiles | Use Case |
-|------|-------|----------|
-| Corner | 16 | Ground transitions (grass/dirt) |
-| Edge | 16 | Linear features (walls, rivers) |
-| Mixed | 48 | Full terrain with corners and edges |
+| Type   | Tiles | Use Case                            |
+|--------|-------|-------------------------------------|
+| Corner | 16    | Ground transitions (grass/dirt)     |
+| Edge   | 16    | Linear features (walls, rivers)     |
+| Mixed  | 48    | Full terrain with corners and edges |
 
 ## Usage
 

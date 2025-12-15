@@ -26,7 +26,10 @@ pub struct TreeViewResult {
     pub select_entity_type_for_placement: Option<String>,
     // Sprite sheet actions
     pub create_sprite_sheet: bool,
+    /// Edit sprite sheet animations (opens Animation Editor)
     pub edit_sprite_sheet: Option<Uuid>,
+    /// Edit sprite sheet grid settings (opens SpriteSheet Editor)
+    pub edit_sprite_sheet_settings: Option<Uuid>,
     pub delete_sprite_sheet: Option<Uuid>,
     pub duplicate_sprite_sheet: Option<Uuid>,
     // Dialogue actions
@@ -947,10 +950,15 @@ fn render_sprite_sheets_section(
                 }
 
                 response.context_menu(|ui| {
-                    if ui.button("Edit").clicked() {
+                    if ui.button("Edit Animations...").clicked() {
                         result.edit_sprite_sheet = Some(sprite_sheet_id);
                         ui.close();
                     }
+                    if ui.button("Edit Sheet Settings...").clicked() {
+                        result.edit_sprite_sheet_settings = Some(sprite_sheet_id);
+                        ui.close();
+                    }
+                    ui.separator();
                     if ui.button("Rename").clicked() {
                         result.rename_sprite_sheet = Some(sprite_sheet_id);
                         ui.close();

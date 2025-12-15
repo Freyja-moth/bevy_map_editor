@@ -62,7 +62,7 @@ fn setup(
     // =========================================================================
     // We load the MapProject and will manually extract the sprite data
     // and set up the components ourselves in setup_sprite_when_ready()
-    let map_handle = asset_server.load("maps/animation_demo.map.json");
+    let map_handle = asset_server.load("maps/example_project.map.json");
     state.map_handle = Some(map_handle);
 
     // HUD
@@ -106,8 +106,8 @@ fn setup_sprite_when_ready(
     // =========================================================================
     // MANUAL: Get the sprite sheet from the project
     // =========================================================================
-    let Some(sprite_data) = project.sprite_sheet_by_name("frog") else {
-        warn!("Sprite sheet 'frog' not found in project");
+    let Some(sprite_data) = project.sprite_sheet_by_name("Frog") else {
+        warn!("Sprite sheet 'Frog' not found in project");
         return;
     };
 

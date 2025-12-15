@@ -11,7 +11,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Bevy Map Editor".to_string(),
-                resolution: (1280, 720).into(),
+                resolution: (1920, 1080).into(),
                 ..default()
             }),
             ..default()

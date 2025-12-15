@@ -26,13 +26,5 @@ thiserror = "2.0"
 default = []
 hot-reload = []
 
-[[example]]
-name = "load_map"
-path = "examples/load_map.rs"
-
-[[example]]
-name = "hot_reload"
-path = "examples/hot_reload.rs"
-
 [lints]
 workspace = true

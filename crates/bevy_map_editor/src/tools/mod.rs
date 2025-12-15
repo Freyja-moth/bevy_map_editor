@@ -189,7 +189,8 @@ fn handle_viewport_input(
     // Check if any modal editors are open (block input to map when they are)
     // TODO: In the future, only block when editors are maximized, not minimized
     let modal_editor_open = editor_state.show_tileset_editor
-        || editor_state.show_sprite_sheet_editor
+        || editor_state.show_spritesheet_editor
+        || editor_state.show_animation_editor
         || editor_state.show_dialogue_editor;
 
     // Determine if we're in rectangle mode for this tool

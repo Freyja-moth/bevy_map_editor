@@ -46,8 +46,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // - Adds Sprite and AnimatedSprite components automatically
     commands.spawn((
         AnimatedSpriteHandle::new(
-            asset_server.load("maps/animation_demo.map.json"),
-            "frog", // sprite sheet name in the editor
+            asset_server.load("maps/example_project.map.json"),
+            "Frog", // sprite sheet name in the editor
             "walk", // initial animation to play
         )
         .with_scale(4.0),

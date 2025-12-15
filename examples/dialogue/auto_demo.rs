@@ -42,7 +42,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     // - Finds dialogue tree by name
     // - Adds DialogueHandle component automatically
     commands.spawn(DialogueTreeHandle::new(
-        asset_server.load("maps/dialogue_demo.map.json"),
+        asset_server.load("maps/example_project.map.json"),
         "merchant_greeting", // dialogue name in the editor
     ));
 

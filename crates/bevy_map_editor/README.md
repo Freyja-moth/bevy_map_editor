@@ -13,14 +13,36 @@ Part of [bevy_map_editor](https://github.com/jbuehler23/bevy_map_editor).
 - Multi-level support with hierarchical view
 - Layer system (tile and object layers)
 - Tileset management with multi-image support
-- Terrain painting with autotile
+- Terrain painting with autotiling
 - Entity placement and property editing
 - Dialogue tree editor with visual node graph
 - Animation/sprite sheet editor
 - Undo/redo support
 - Keyboard shortcuts
 
-## Usage
+## Installation (Standalone Binary)
+
+### From crates.io
+
+```bash
+cargo install bevy_map_editor
+```
+
+### From source
+
+```bash
+git clone https://github.com/jbuehler23/bevy_map_editor
+cd bevy_map_editor
+cargo install --path crates/bevy_map_editor
+```
+
+### Run the editor
+
+```bash
+bevy_map_editor
+```
+
+## Usage (As a Library)
 
 ```rust
 use bevy::prelude::*;
@@ -36,8 +58,8 @@ fn main() {
 
 ## Feature Flags
 
-| Flag | Description |
-|------|-------------|
+| Flag      | Description                                                  |
+|-----------|--------------------------------------------------------------|
 | `runtime` | Enable viewport rendering via bevy_ecs_tilemap (recommended) |
 
 ```toml
@@ -47,30 +69,30 @@ bevy_map_editor = { version = "0.1", features = ["runtime"] }
 
 ## UI Panels
 
-| Panel | Purpose |
-|-------|---------|
-| Menu Bar | File, Edit, View, Project menus |
-| Toolbar | Tool selection (Select, Paint, Erase, Fill, Entity) |
-| Project Tree | Hierarchical view of levels, layers, dialogues, animations |
-| Inspector | Property editing for selected items |
-| Terrain Palette | Terrain set and terrain selection for autotiling |
-| Tileset Panel | Tile selection from loaded tilesets |
-| Viewport | Map preview and editing canvas |
+| Panel           | Purpose                                                    |
+|-----------------|------------------------------------------------------------|
+| Menu Bar        | File, Edit, View, Project menus                            |
+| Toolbar         | Tool selection (Select, Paint, Erase, Fill, Entity)        |
+| Project Tree    | Hierarchical view of levels, layers, dialogues, animations |
+| Inspector       | Property editing for selected items                        |
+| Terrain Palette | Terrain set and terrain selection for autotiling           |
+| Tileset Panel   | Tile selection from loaded tilesets                        |
+| Viewport        | Map preview and editing canvas                             |
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+N` | New Project |
-| `Ctrl+O` | Open Project |
-| `Ctrl+S` | Save |
-| `Ctrl+Shift+S` | Save As |
-| `Ctrl+Z` | Undo |
-| `Ctrl+Y` | Redo |
-| `Ctrl+C` | Copy |
-| `Ctrl+V` | Paste |
-| `Ctrl+X` | Cut |
-| `G` | Toggle Grid |
+| Shortcut       | Action       |
+|----------------|--------------|
+| `Ctrl+N`       | New Project  |
+| `Ctrl+O`       | Open Project |
+| `Ctrl+S`       | Save         |
+| `Ctrl+Shift+S` | Save As      |
+| `Ctrl+Z`       | Undo         |
+| `Ctrl+Y`       | Redo         |
+| `Ctrl+C`       | Copy         |
+| `Ctrl+V`       | Paste        |
+| `Ctrl+X`       | Cut          |
+| `G`            | Toggle Grid  |
 
 ## License
 

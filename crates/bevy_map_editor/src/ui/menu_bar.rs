@@ -139,16 +139,14 @@ pub fn render_menu_bar(
 
             // Tools menu - Specialized editors
             ui.menu_button("Tools", |ui| {
-                if ui.button("Sprite Sheet Editor...").clicked() {
-                    editor_state.show_sprite_sheet_editor = true;
+                // Note: Sprite Sheet Editor and Animation Editor are opened via context menu
+                // on specific sprite sheet assets in the tree view
+                if ui.button("Tileset Editor...").clicked() {
+                    editor_state.show_tileset_editor = true;
                     ui.close();
                 }
                 if ui.button("Dialogue Editor...").clicked() {
                     editor_state.show_dialogue_editor = true;
-                    ui.close();
-                }
-                if ui.button("Tileset Editor...").clicked() {
-                    editor_state.show_tileset_editor = true;
                     ui.close();
                 }
             });

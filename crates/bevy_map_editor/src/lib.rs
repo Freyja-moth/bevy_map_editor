@@ -47,9 +47,9 @@ use project::Project;
 use render::MapRenderPlugin;
 use tools::EditorToolsPlugin;
 use ui::{
-    DialogueEditorState, EditorTool, EditorUiPlugin, EntityPaintState, PendingAction,
-    SchemaEditorState, Selection, SpriteEditorState, TerrainPaintState, TilesetEditorState,
-    ToolMode,
+    AnimationEditorState, DialogueEditorState, EditorTool, EditorUiPlugin, EntityPaintState,
+    PendingAction, SchemaEditorState, Selection, SpriteSheetEditorState, TerrainPaintState,
+    TilesetEditorState, ToolMode,
 };
 
 /// Error types for asset path handling
@@ -393,11 +393,13 @@ pub struct EditorState {
     pub show_tileset_editor: bool,
     pub tileset_editor_state: TilesetEditorState,
 
-    // Sprite Sheet Editor
-    pub show_sprite_sheet_editor: bool,
-    pub sprite_sheet_editor_state: SpriteEditorState,
-    /// ID of sprite sheet asset being edited (vs inline property)
-    pub sprite_sheet_editor_asset_id: Option<uuid::Uuid>,
+    // SpriteSheet Editor (for spritesheet setup: image loading, grid config)
+    pub show_spritesheet_editor: bool,
+    pub spritesheet_editor_state: SpriteSheetEditorState,
+
+    // Animation Editor (for animation definition: frames, timing, triggers, windows)
+    pub show_animation_editor: bool,
+    pub animation_editor_state: AnimationEditorState,
 
     // Dialogue Editor
     pub show_dialogue_editor: bool,
@@ -508,9 +510,11 @@ impl Default for EditorState {
             show_tileset_editor: false,
             tileset_editor_state: TilesetEditorState::default(),
 
-            show_sprite_sheet_editor: false,
-            sprite_sheet_editor_state: SpriteEditorState::new(),
-            sprite_sheet_editor_asset_id: None,
+            show_spritesheet_editor: false,
+            spritesheet_editor_state: SpriteSheetEditorState::new(),
+
+            show_animation_editor: false,
+            animation_editor_state: AnimationEditorState::new(),
 
             show_dialogue_editor: false,
             dialogue_editor_state: DialogueEditorState::new(),

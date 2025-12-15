@@ -72,7 +72,7 @@ fn setup(
 
     // Load map project from embedded JSON
     // In a real game, you would load this from a file or asset
-    let json = include_str!("../../crates/bevy_map_runtime/assets/maps/example_project.map.json");
+    let json = include_str!("../assets/maps/example_project.map.json");
     let project: MapProject = serde_json::from_str(json).expect("Failed to parse map JSON");
 
     // Load tileset textures

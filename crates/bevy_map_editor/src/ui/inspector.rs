@@ -31,7 +31,10 @@ pub struct InspectorResult {
     pub delete_entity: Option<(Uuid, Uuid)>,
     pub open_sprite_editor: Option<(String, Uuid)>,
     pub open_dialogue_editor: Option<(String, Uuid)>,
+    /// Edit sprite sheet animations (opens Animation Editor)
     pub edit_sprite_sheet: Option<Uuid>,
+    /// Edit sprite sheet grid settings (opens SpriteSheet Editor)
+    pub edit_sprite_sheet_settings: Option<Uuid>,
     pub edit_dialogue: Option<String>,
     /// Create a new data instance and add its ID to an array property
     /// (type_name, target_instance_id, property_name)
@@ -581,9 +584,14 @@ fn render_sprite_sheet_inspector(
 
     ui.separator();
 
-    if ui.button("Open Editor").clicked() {
-        result.edit_sprite_sheet = Some(sprite_sheet_id);
-    }
+    ui.horizontal(|ui| {
+        if ui.button("Edit Animations").clicked() {
+            result.edit_sprite_sheet = Some(sprite_sheet_id);
+        }
+        if ui.button("Edit Sheet").clicked() {
+            result.edit_sprite_sheet_settings = Some(sprite_sheet_id);
+        }
+    });
 }
 
 fn render_dialogue_inspector(

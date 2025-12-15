@@ -33,25 +33,25 @@ pub struct Enemy {
 
 ### Container: `#[map_entity(...)]`
 
-| Attribute | Required | Description |
-|-----------|----------|-------------|
-| `type_name = "Name"` | Yes | Entity type name as used in editor |
+| Attribute            | Required | Description                        |
+|----------------------|----------|------------------------------------|
+| `type_name = "Name"` | Yes      | Entity type name as used in editor |
 
 ### Field: `#[map_prop(...)]`
 
-| Attribute | Description |
-|-----------|-------------|
+| Attribute            | Description                                  |
+|----------------------|----------------------------------------------|
 | `name = "prop_name"` | Override property name (default: field name) |
-| `default = value` | Default value if property missing |
+| `default = value`    | Default value if property missing            |
 
 ### Field: `#[map_sprite(...)]`
 
 Inject sprite handle from map data.
 
-| Usage | Description |
-|-------|-------------|
-| `#[map_sprite]` | Use field name as property name |
-| `#[map_sprite("name")]` | Use specified property name |
+| Usage                   | Description                     |
+|-------------------------|---------------------------------|
+| `#[map_sprite]`         | Use field name as property name |
+| `#[map_sprite("name")]` | Use specified property name     |
 
 Field must be `Option<Handle<Image>>`.
 
@@ -60,7 +60,7 @@ Field must be `Option<Handle<Image>>`.
 ```rust
 use bevy::prelude::*;
 use bevy_map_derive::MapEntity;
-use bevy_map_runtime::MapEntityRegistry;
+use bevy_map_runtime::{MapRuntimePlugin, MapEntityExt};
 
 #[derive(Component, MapEntity)]
 #[map_entity(type_name = "Player")]
@@ -75,10 +75,11 @@ pub struct Player {
     pub sprite: Option<Handle<Image>>,
 }
 
-// Register in your app
-fn setup(mut registry: ResMut<MapEntityRegistry>) {
-    registry.register::<Player>();
-}
+// Register in your app builder
+App::new()
+    .add_plugins(MapRuntimePlugin)
+    .register_map_entity::<Player>()
+    // ... other setup
 ```
 
 ## License

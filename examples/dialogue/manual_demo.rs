@@ -64,7 +64,7 @@ fn setup(
     // MANUAL LOADING: Load the MapProject asset
     // =========================================================================
     // We load the MapProject and will manually extract the dialogue tree
-    let map_handle = asset_server.load("maps/dialogue_demo.map.json");
+    let map_handle = asset_server.load("maps/example_project.map.json");
     state.map_handle = Some(map_handle);
 
     // Display

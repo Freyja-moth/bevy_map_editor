@@ -14,31 +14,31 @@ Part of [bevy_map_editor](https://github.com/jbuehler23/bevy_map_editor).
 
 ## Node Types
 
-| Type | Description |
-|------|-------------|
-| `Text` | NPC speaks, then continues to next node |
-| `Choice` | Player selects from options |
-| `Condition` | Branch based on game state |
-| `Action` | Trigger game actions (give item, start quest) |
-| `End` | Dialogue terminates |
+| Type        | Description                                   |
+|-------------|-----------------------------------------------|
+| `Text`      | NPC speaks, then continues to next node       |
+| `Choice`    | Player selects from options                   |
+| `Condition` | Branch based on game state                    |
+| `Action`    | Trigger game actions (give item, start quest) |
+| `End`       | Dialogue terminates                           |
 
 ## Types
 
-| Type | Description |
-|------|-------------|
-| `DialogueTree` | Complete dialogue with all nodes |
-| `DialogueNode` | Single node in the tree |
-| `DialogueChoice` | Player choice option |
+| Type             | Description                       |
+|------------------|-----------------------------------|
+| `DialogueTree`   | Complete dialogue with all nodes  |
+| `DialogueNode`   | Single node in the tree           |
+| `DialogueChoice` | Player choice option              |
 | `DialogueRunner` | Resource tracking active dialogue |
-| `DialogueHandle` | Component holding dialogue asset |
+| `DialogueHandle` | Component holding dialogue asset  |
 
 ## Events
 
-| Event | Description |
-|-------|-------------|
-| `StartDialogueEvent` | Begin a dialogue |
+| Event                 | Description          |
+|-----------------------|----------------------|
+| `StartDialogueEvent`  | Begin a dialogue     |
 | `DialogueChoiceEvent` | Player made a choice |
-| `DialogueEndEvent` | Dialogue finished |
+| `DialogueEndEvent`    | Dialogue finished    |
 
 ## Usage
 
