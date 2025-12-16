@@ -259,6 +259,39 @@ impl Project {
             None
         }
     }
+
+    /// Validate and clean up orphaned references in the project
+    ///
+    /// This removes terrain sets that reference non-existent tilesets,
+    /// which can happen if a tileset was deleted before cascade delete was implemented.
+    pub fn validate_and_cleanup(&mut self) {
+        use std::collections::HashSet;
+
+        let valid_tileset_ids: HashSet<Uuid> = self.tilesets.iter().map(|t| t.id).collect();
+
+        // Remove terrain sets that reference non-existent tilesets
+        let original_count = self.autotile_config.terrain_sets.len();
+        self.autotile_config.terrain_sets.retain(|ts| {
+            let exists = valid_tileset_ids.contains(&ts.tileset_id);
+            if !exists {
+                bevy::log::warn!(
+                    "Removing orphaned terrain set '{}' - tileset {} no longer exists",
+                    ts.name,
+                    ts.tileset_id
+                );
+            }
+            exists
+        });
+
+        let removed = original_count - self.autotile_config.terrain_sets.len();
+        if removed > 0 {
+            bevy::log::info!(
+                "Cleaned up {} orphaned terrain set(s) from project",
+                removed
+            );
+            self.dirty = true;
+        }
+    }
 }
 
 /// A data instance (non-placeable thing like an Item, Quest, etc.)

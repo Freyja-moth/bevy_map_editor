@@ -241,6 +241,20 @@ const NEIGHBOR_OFFSETS: [(i32, i32); 8] = [
     (-1, 1),  // 7 = TopLeft
 ];
 
+/// Get the active position indices for a terrain set type
+///
+/// In Tiled's Wang system:
+/// - Corner mode: only corner positions (odd indices 1,3,5,7)
+/// - Edge mode: only edge positions (even indices 0,2,4,6)
+/// - Mixed mode: all 8 positions
+fn get_active_positions(set_type: TerrainSetType) -> &'static [usize] {
+    match set_type {
+        TerrainSetType::Corner => &[1, 3, 5, 7], // TopRight, BottomRight, BottomLeft, TopLeft
+        TerrainSetType::Edge => &[0, 2, 4, 6],   // Top, Right, Bottom, Left
+        TerrainSetType::Mixed => &[0, 1, 2, 3, 4, 5, 6, 7], // All 8
+    }
+}
+
 // =============================================================================
 // WangFiller - Main fill algorithm (Tiled-compatible)
 // =============================================================================
@@ -261,6 +275,8 @@ pub struct WangFiller<'a> {
     corrections_enabled: bool,
     /// Random number generator for probability-weighted selection
     rng: SmallRng,
+    /// Enable debug logging for algorithm tracing
+    pub debug: bool,
 }
 
 impl<'a> WangFiller<'a> {
@@ -271,6 +287,7 @@ impl<'a> WangFiller<'a> {
             corrections: Vec::new(),
             corrections_enabled: false,
             rng: SmallRng::seed_from_u64(0),
+            debug: false,
         }
     }
 
@@ -282,6 +299,7 @@ impl<'a> WangFiller<'a> {
             corrections: Vec::new(),
             corrections_enabled: false,
             rng: SmallRng::seed_from_u64(seed),
+            debug: false,
         }
     }
 
@@ -399,10 +417,16 @@ impl<'a> WangFiller<'a> {
     ///
     /// Returns None if the tile violates a hard constraint,
     /// otherwise returns the penalty score (lower is better)
+    ///
+    /// Only scores the active positions for this terrain set type:
+    /// - Corner: positions 1,3,5,7 (corners only)
+    /// - Edge: positions 0,2,4,6 (edges only)
+    /// - Mixed: all 8 positions
     fn score_tile(&self, cell: &CellInfo, tile_wang: &WangId) -> Option<f32> {
+        let active_positions = get_active_positions(self.terrain_set.set_type);
         let mut penalty = 0.0f32;
 
-        for i in 0..8 {
+        for &i in active_positions {
             let want = cell.desired.colors[i];
             let have = tile_wang.colors[i];
 
@@ -412,8 +436,17 @@ impl<'a> WangFiller<'a> {
                     return None; // Reject tile
                 }
             } else if want != 0 && want != have {
-                // Soft preference - add penalty for mismatch
-                penalty += 1.0;
+                // Soft preference - use transition penalty
+                // Convert colors to terrain indices (color 1 = terrain 0, color 2 = terrain 1, etc.)
+                let from_terrain = (want - 1) as usize;
+                let to_terrain = if have == 0 {
+                    // Tile has no terrain at this position - use a default penalty
+                    penalty += 1.0;
+                    continue;
+                } else {
+                    (have - 1) as usize
+                };
+                penalty += self.terrain_set.transition_penalty(from_terrain, to_terrain);
             }
         }
 
@@ -422,8 +455,40 @@ impl<'a> WangFiller<'a> {
 
     /// Find the best matching tile using penalty scoring
     fn find_best_match(&mut self, cell: &CellInfo) -> Option<u32> {
+        let active_positions = get_active_positions(self.terrain_set.set_type);
+
+        if self.debug {
+            log::info!(
+                "find_best_match: Looking for tile with constraints (type {:?}, active positions {:?}):",
+                self.terrain_set.set_type,
+                active_positions
+            );
+            for &i in active_positions {
+                if cell.mask[i] {
+                    log::info!(
+                        "  Position {}: HARD constraint = {} (terrain {})",
+                        i,
+                        cell.desired.colors[i],
+                        if cell.desired.colors[i] > 0 {
+                            cell.desired.colors[i] - 1
+                        } else {
+                            0
+                        }
+                    );
+                } else if cell.desired.colors[i] != 0 {
+                    log::info!(
+                        "  Position {}: soft preference = {} (terrain {})",
+                        i,
+                        cell.desired.colors[i],
+                        cell.desired.colors[i] - 1
+                    );
+                }
+            }
+        }
+
         let mut candidates: Vec<(u32, f32)> = Vec::new();
         let mut best_penalty = f32::MAX;
+        let mut rejected_count = 0;
 
         for (&tile_id, tile_terrain) in &self.terrain_set.tile_terrains {
             if !tile_terrain.has_any_terrain() {
@@ -433,19 +498,55 @@ impl<'a> WangFiller<'a> {
             let tile_wang = self.tile_terrain_to_wang_id(tile_terrain);
 
             if let Some(penalty) = self.score_tile(cell, &tile_wang) {
+                if self.debug {
+                    log::info!(
+                        "  Tile {}: ACCEPTED (penalty: {}, wang: {:?})",
+                        tile_id,
+                        penalty,
+                        tile_wang.colors
+                    );
+                }
                 if penalty < best_penalty {
                     best_penalty = penalty;
                     candidates.clear();
                 }
                 if (penalty - best_penalty).abs() < f32::EPSILON {
-                    // Use inverse penalty as probability weight
-                    let weight = 1.0 / (1.0 + penalty);
+                    // Weight by both inverse penalty AND per-tile probability
+                    let tile_prob = self.terrain_set.get_tile_probability(tile_id);
+                    let weight = tile_prob / (1.0 + penalty);
                     candidates.push((tile_id, weight));
+                }
+            } else {
+                rejected_count += 1;
+                if self.debug {
+                    log::info!(
+                        "  Tile {}: REJECTED (wang: {:?})",
+                        tile_id,
+                        tile_wang.colors
+                    );
                 }
             }
         }
 
-        self.random_pick(&candidates)
+        if self.debug {
+            log::info!(
+                "find_best_match: {} candidates, {} rejected",
+                candidates.len(),
+                rejected_count
+            );
+        }
+
+        let result = self.random_pick(&candidates);
+
+        if self.debug {
+            if let Some(tile_id) = result {
+                log::info!("find_best_match: Selected tile {}", tile_id);
+            } else {
+                log::warn!("find_best_match: No matching tile found!");
+            }
+        }
+
+        result
     }
 
     /// Pick a random tile from candidates weighted by probability
@@ -515,7 +616,10 @@ impl<'a> WangFiller<'a> {
         for &(x, y) in region {
             let idx = (y as u32 * width + x as u32) as usize;
 
-            // Preserve existing tile attributes as soft preferences
+            // IMPORTANT: Existing tile data is SOFT preference only
+            // We set desired.colors but NEVER mask bits from existing tiles
+            // This matches Tiled's behavior - existing tiles influence selection
+            // but don't force specific outcomes
             if let Some(tile_id) = tiles.get(idx).copied().flatten() {
                 if let Some(terrain_data) = self.terrain_set.get_tile_terrain(tile_id) {
                     let existing = self.tile_terrain_to_wang_id(terrain_data);
@@ -524,6 +628,7 @@ impl<'a> WangFiller<'a> {
                     for i in 0..8 {
                         if !cell.mask[i] && existing.colors[i] != 0 {
                             cell.desired.colors[i] = existing.colors[i];
+                            // Note: We do NOT set mask[i] = true here!
                         }
                     }
                 }
@@ -546,6 +651,11 @@ impl<'a> WangFiller<'a> {
         self.corrections_enabled = true;
 
         for &(x, y) in region {
+            // Bounds check
+            if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
+                continue;
+            }
+
             let cell_info = self.cells.get(&(x, y)).cloned().unwrap_or_default();
 
             if let Some(chosen_tile) = self.find_best_match(&cell_info) {
@@ -582,10 +692,10 @@ impl<'a> WangFiller<'a> {
 
                     // Only add for correction if:
                     // - corrections enabled
-                    // - edge (not corner) - this matches Tiled's behavior
                     // - outside region
                     // - tile exists and violates constraints
-                    if self.corrections_enabled && !WangId::is_corner(dir_idx) {
+                    // Note: We check ALL neighbors (including diagonals) for corrections
+                    if self.corrections_enabled {
                         let outside = !region_set.contains(&(nx, ny));
                         if outside {
                             // Check if neighbor violates the new constraint
@@ -618,6 +728,11 @@ impl<'a> WangFiller<'a> {
         for (x, y) in correction_list {
             // Skip if somehow in region
             if region_set.contains(&(x, y)) {
+                continue;
+            }
+
+            // Bounds check
+            if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
                 continue;
             }
 
@@ -761,11 +876,26 @@ pub fn get_paint_target(
             edge_x: (tile_x + 1).max(0) as u32,
             tile_y: tile_y.max(0) as u32,
         },
-        // Center defaults to corner
-        (1, 1) => PaintTarget::Corner {
-            corner_x: tile_x.max(0) as u32,
-            corner_y: tile_y.max(0) as u32,
-        },
+        // Center zone: paint nearest corner based on exact position
+        (1, 1) => {
+            // Determine which quadrant within the center zone
+            let center_local_x = (local_x - 0.33) / 0.34; // Normalize to 0-1 within center
+            let center_local_y = (local_y - 0.33) / 0.34;
+            let corner_x = if center_local_x < 0.5 {
+                tile_x
+            } else {
+                tile_x + 1
+            };
+            let corner_y = if center_local_y < 0.5 {
+                tile_y
+            } else {
+                tile_y + 1
+            };
+            PaintTarget::Corner {
+                corner_x: corner_x.max(0) as u32,
+                corner_y: corner_y.max(0) as u32,
+            }
+        }
         _ => unreachable!(),
     }
 }
@@ -774,14 +904,14 @@ pub fn get_paint_target(
 // Paint Functions
 // =============================================================================
 
-/// Paint terrain at a corner intersection
+/// Paint terrain at a corner intersection (with optional debug logging)
 ///
 /// A corner is at the intersection of 4 tiles. In Y-UP coordinates:
 /// - (cx-1, cy-1): Tile below-left, we paint its TopRight corner (index 1)
 /// - (cx,   cy-1): Tile below-right, we paint its TopLeft corner (index 7)
 /// - (cx-1, cy  ): Tile above-left, we paint its BottomRight corner (index 3)
 /// - (cx,   cy  ): Tile above-right, we paint its BottomLeft corner (index 5)
-pub fn paint_terrain(
+pub fn paint_terrain_with_debug(
     tiles: &mut [Option<u32>],
     width: u32,
     height: u32,
@@ -789,11 +919,23 @@ pub fn paint_terrain(
     corner_y: u32,
     terrain_set: &TerrainSet,
     terrain_index: usize,
+    debug: bool,
 ) {
     let cx = corner_x as i32;
     let cy = corner_y as i32;
     let color = (terrain_index + 1) as u8;
-    let is_mixed = terrain_set.set_type == TerrainSetType::Mixed;
+
+    if debug {
+        log::info!("=== paint_terrain_with_debug ===");
+        log::info!(
+            "Corner: ({}, {}), Terrain: {} (color {}), Type: {:?}",
+            corner_x,
+            corner_y,
+            terrain_index,
+            color,
+            terrain_set.set_type
+        );
+    }
 
     // Corner affects 4 tiles - map to their specific corner indices
     let affected: [(i32, i32, usize); 4] = [
@@ -806,6 +948,7 @@ pub fn paint_terrain(
     // Seed based on corner position for deterministic results
     let seed = (corner_x as u64) << 32 | (corner_y as u64);
     let mut filler = WangFiller::with_seed(terrain_set, seed);
+    filler.debug = debug;
     let mut region = Vec::new();
 
     for &(tx, ty, corner_idx) in &affected {
@@ -816,26 +959,53 @@ pub fn paint_terrain(
             cell.mask[corner_idx] = true;
             cell.desired.colors[corner_idx] = color;
 
-            // For Mixed terrain, also constrain adjacent edges
-            if is_mixed {
-                let adjacent_edges: [usize; 2] = match corner_idx {
-                    1 => [0, 2], // TopRight: Top + Right
-                    3 => [2, 4], // BottomRight: Right + Bottom
-                    5 => [4, 6], // BottomLeft: Bottom + Left
-                    7 => [6, 0], // TopLeft: Left + Top
-                    _ => continue,
-                };
-                for &edge_idx in &adjacent_edges {
-                    cell.mask[edge_idx] = true;
-                    cell.desired.colors[edge_idx] = color;
-                }
+            if debug {
+                log::info!(
+                    "Tile ({}, {}): Setting HARD constraint at corner {} = {}",
+                    tx,
+                    ty,
+                    corner_idx,
+                    color
+                );
             }
+
+            // Note: In Tiled's Mixed mode, corners and edges are independent.
+            // We do NOT constrain adjacent edges when painting a corner.
 
             region.push((tx, ty));
         }
     }
 
+    if debug {
+        log::info!("Affected region: {:?}", region);
+        log::info!(
+            "Terrain set has {} tiles with terrain data",
+            terrain_set.tile_terrains.len()
+        );
+    }
+
     filler.apply(tiles, width, height, &region);
+}
+
+pub fn paint_terrain(
+    tiles: &mut [Option<u32>],
+    width: u32,
+    height: u32,
+    corner_x: u32,
+    corner_y: u32,
+    terrain_set: &TerrainSet,
+    terrain_index: usize,
+) {
+    paint_terrain_with_debug(
+        tiles,
+        width,
+        height,
+        corner_x,
+        corner_y,
+        terrain_set,
+        terrain_index,
+        false,
+    );
 }
 
 /// Paint terrain at a horizontal edge
@@ -851,7 +1021,6 @@ pub fn paint_terrain_horizontal_edge(
     let tx = tile_x as i32;
     let ey = edge_y as i32;
     let color = (terrain_index + 1) as u8;
-    let is_mixed = terrain_set.set_type == TerrainSetType::Mixed;
 
     // Seed based on edge position for deterministic results
     let seed = (tile_x as u64) << 32 | (edge_y as u64) | 0x1000_0000_0000_0000;
@@ -870,18 +1039,8 @@ pub fn paint_terrain_horizontal_edge(
             cell.mask[edge_idx] = true;
             cell.desired.colors[edge_idx] = color;
 
-            // For Mixed terrain, also set the adjacent corners
-            if is_mixed {
-                let adjacent_corners: [usize; 2] = match edge_idx {
-                    0 => [7, 1], // Top: TopLeft + TopRight
-                    4 => [5, 3], // Bottom: BottomLeft + BottomRight
-                    _ => continue,
-                };
-                for &corner_idx in &adjacent_corners {
-                    cell.mask[corner_idx] = true;
-                    cell.desired.colors[corner_idx] = color;
-                }
-            }
+            // Note: In Tiled's Mixed mode, edges and corners are independent.
+            // We do NOT constrain adjacent corners when painting an edge.
 
             if !region.contains(&(x, y)) {
                 region.push((x, y));
@@ -905,7 +1064,6 @@ pub fn paint_terrain_vertical_edge(
     let ex = edge_x as i32;
     let ty = tile_y as i32;
     let color = (terrain_index + 1) as u8;
-    let is_mixed = terrain_set.set_type == TerrainSetType::Mixed;
 
     // Seed based on edge position for deterministic results
     let seed = (edge_x as u64) << 32 | (tile_y as u64) | 0x2000_0000_0000_0000;
@@ -924,18 +1082,8 @@ pub fn paint_terrain_vertical_edge(
             cell.mask[edge_idx] = true;
             cell.desired.colors[edge_idx] = color;
 
-            // For Mixed terrain, also set the adjacent corners
-            if is_mixed {
-                let adjacent_corners: [usize; 2] = match edge_idx {
-                    2 => [1, 3], // Right: TopRight + BottomRight
-                    6 => [7, 5], // Left: TopLeft + BottomLeft
-                    _ => continue,
-                };
-                for &corner_idx in &adjacent_corners {
-                    cell.mask[corner_idx] = true;
-                    cell.desired.colors[corner_idx] = color;
-                }
-            }
+            // Note: In Tiled's Mixed mode, edges and corners are independent.
+            // We do NOT constrain adjacent corners when painting an edge.
 
             if !region.contains(&(x, y)) {
                 region.push((x, y));
@@ -946,18 +1094,27 @@ pub fn paint_terrain_vertical_edge(
     filler.apply(tiles, width, height, &region);
 }
 
-/// Unified terrain painting function that handles corners and edges
-pub fn paint_terrain_at_target(
+/// Unified terrain painting function that handles corners and edges (with optional debug)
+pub fn paint_terrain_at_target_with_debug(
     tiles: &mut [Option<u32>],
     width: u32,
     height: u32,
     target: PaintTarget,
     terrain_set: &TerrainSet,
     terrain_index: usize,
+    debug: bool,
 ) {
+    if debug {
+        log::info!(
+            "paint_terrain_at_target: {:?}, terrain_index: {}",
+            target,
+            terrain_index
+        );
+    }
+
     match target {
         PaintTarget::Corner { corner_x, corner_y } => {
-            paint_terrain(
+            paint_terrain_with_debug(
                 tiles,
                 width,
                 height,
@@ -965,9 +1122,11 @@ pub fn paint_terrain_at_target(
                 corner_y,
                 terrain_set,
                 terrain_index,
+                debug,
             );
         }
         PaintTarget::HorizontalEdge { tile_x, edge_y } => {
+            // TODO: Add debug version of horizontal edge painting
             paint_terrain_horizontal_edge(
                 tiles,
                 width,
@@ -979,6 +1138,7 @@ pub fn paint_terrain_at_target(
             );
         }
         PaintTarget::VerticalEdge { edge_x, tile_y } => {
+            // TODO: Add debug version of vertical edge painting
             paint_terrain_vertical_edge(
                 tiles,
                 width,
@@ -990,6 +1150,26 @@ pub fn paint_terrain_at_target(
             );
         }
     }
+}
+
+/// Unified terrain painting function that handles corners and edges
+pub fn paint_terrain_at_target(
+    tiles: &mut [Option<u32>],
+    width: u32,
+    height: u32,
+    target: PaintTarget,
+    terrain_set: &TerrainSet,
+    terrain_index: usize,
+) {
+    paint_terrain_at_target_with_debug(
+        tiles,
+        width,
+        height,
+        target,
+        terrain_set,
+        terrain_index,
+        false,
+    );
 }
 
 /// Update a single tile based on its neighbors

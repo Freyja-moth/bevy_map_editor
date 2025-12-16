@@ -34,7 +34,15 @@ impl Project {
             serde_json::from_str(&content).map_err(|e| ProjectError::ParseError(e.to_string()))?;
 
         project.path = Some(path.to_path_buf());
-        project.dirty = false;
+
+        // Validate and clean up any orphaned references (e.g., terrain sets pointing to deleted tilesets)
+        project.validate_and_cleanup();
+
+        // Only mark dirty if we haven't modified anything
+        // (validate_and_cleanup sets dirty=true if it removes orphaned data)
+        if !project.dirty {
+            project.dirty = false;
+        }
 
         Ok(project)
     }

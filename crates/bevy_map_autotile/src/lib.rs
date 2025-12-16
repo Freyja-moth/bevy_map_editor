@@ -47,9 +47,10 @@ pub mod wang;
 pub use config::{AutotileConfig, LegacyTerrainType, TerrainBrush, TerrainType};
 pub use terrain::{Color, Terrain, TerrainSet, TerrainSetType, TileConstraints, TileTerrainData};
 pub use wang::{
-    get_paint_target, paint_terrain, paint_terrain_at_target, paint_terrain_horizontal_edge,
-    paint_terrain_vertical_edge, preview_terrain_at_target, update_tile_with_neighbors, CellInfo,
-    PaintTarget, TerrainId, WangFiller, WangId, WangPosition,
+    get_paint_target, paint_terrain, paint_terrain_at_target, paint_terrain_at_target_with_debug,
+    paint_terrain_horizontal_edge, paint_terrain_vertical_edge, paint_terrain_with_debug,
+    preview_terrain_at_target, update_tile_with_neighbors, CellInfo, PaintTarget, TerrainId,
+    WangFiller, WangId, WangPosition,
 };
 
 // Re-export legacy module contents for backward compatibility

@@ -219,6 +219,10 @@ pub struct TerrainSet {
     pub terrains: Vec<Terrain>,
     /// Terrain assignments for each tile (tile_index -> TileTerrainData)
     pub tile_terrains: HashMap<u32, TileTerrainData>,
+    /// Per-tile probability weights (default 1.0 if not specified)
+    /// Used by WangFiller to bias tile selection toward certain variants
+    #[serde(default)]
+    pub tile_probabilities: HashMap<u32, f32>,
 }
 
 impl TerrainSet {
@@ -230,6 +234,7 @@ impl TerrainSet {
             set_type,
             terrains: Vec::new(),
             tile_terrains: HashMap::new(),
+            tile_probabilities: HashMap::new(),
         }
     }
 
@@ -282,6 +287,27 @@ impl TerrainSet {
         self.tile_terrains.get(&tile_index)
     }
 
+    /// Set the probability weight for a specific tile (used in random selection)
+    /// Higher values make the tile more likely to be chosen among equal matches.
+    /// Default is 1.0 if not set.
+    pub fn set_tile_probability(&mut self, tile_index: u32, probability: f32) {
+        if (probability - 1.0).abs() < f32::EPSILON {
+            // Remove default value to save space
+            self.tile_probabilities.remove(&tile_index);
+        } else {
+            self.tile_probabilities.insert(tile_index, probability);
+        }
+    }
+
+    /// Get the probability weight for a specific tile
+    /// Returns 1.0 if no custom probability is set
+    pub fn get_tile_probability(&self, tile_index: u32) -> f32 {
+        self.tile_probabilities
+            .get(&tile_index)
+            .copied()
+            .unwrap_or(1.0)
+    }
+
     /// Find a tile that matches the given constraints (Tiled-style penalty scoring)
     /// Returns the best matching tile, even if not perfect
     pub fn find_matching_tile(&self, constraints: &TileConstraints) -> Option<u32> {
@@ -291,16 +317,16 @@ impl TerrainSet {
     /// Find the best tile match using Tiled-style penalty scoring
     /// Returns (tile_index, penalty_score) where lower score = better match
     /// Returns None only if no tiles have terrain data
-    pub fn find_best_tile(&self, constraints: &TileConstraints) -> Option<(u32, i32)> {
+    pub fn find_best_tile(&self, constraints: &TileConstraints) -> Option<(u32, f32)> {
         let position_count = self.set_type.position_count();
-        let mut best_tile: Option<(u32, i32)> = None;
+        let mut best_tile: Option<(u32, f32)> = None;
 
         for (&tile_index, tile_data) in &self.tile_terrains {
             if !tile_data.has_any_terrain() {
                 continue;
             }
 
-            let mut penalty = 0i32;
+            let mut penalty = 0.0f32;
             let mut impossible = false;
 
             for i in 0..position_count {
@@ -355,12 +381,16 @@ impl TerrainSet {
 
     /// Calculate transition penalty between two terrain types
     /// Returns 0 for same terrain, positive for different terrains
-    fn transition_penalty(&self, from: usize, to: usize) -> i32 {
+    ///
+    /// This can be extended in the future to support custom transition costs
+    /// for specific terrain pairs (e.g., grass-to-dirt = 1, grass-to-water = 2)
+    pub fn transition_penalty(&self, from: usize, to: usize) -> f32 {
         if from == to {
-            0
+            0.0
         } else {
             // Simple penalty: 1 per mismatch
-            1
+            // Future: could look up terrain-specific transition costs
+            1.0
         }
     }
 

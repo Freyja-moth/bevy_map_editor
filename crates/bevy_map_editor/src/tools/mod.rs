@@ -114,6 +114,7 @@ fn handle_viewport_input(
     windows: Query<&Window>,
     camera_q: Query<(&Camera, &GlobalTransform), With<Camera2d>>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     let Ok(ctx) = contexts.ctx_mut() else { return };
 
@@ -471,6 +472,9 @@ fn handle_viewport_input(
                 );
             }
             EditorTool::Terrain => {
+                // Ctrl+click enables full-tile mode (paints all 8 positions of tile)
+                let full_tile_mode = keyboard.pressed(KeyCode::ControlLeft)
+                    || keyboard.pressed(KeyCode::ControlRight);
                 paint_terrain_tile(
                     &mut editor_state,
                     &mut project,
@@ -478,6 +482,7 @@ fn handle_viewport_input(
                     &mut input_state,
                     &mut stroke_tracker,
                     world_pos,
+                    full_tile_mode,
                 );
             }
             EditorTool::Erase => {
@@ -1329,6 +1334,7 @@ fn fill_area(
 }
 
 /// Paint a terrain tile with autotiling at the given world position
+/// If full_tile_mode is true (Ctrl held), paints all 8 positions of the tile
 fn paint_terrain_tile(
     editor_state: &mut EditorState,
     project: &mut Project,
@@ -1336,6 +1342,7 @@ fn paint_terrain_tile(
     input_state: &mut ViewportInputState,
     stroke_tracker: &mut PaintStrokeTracker,
     world_pos: Vec2,
+    full_tile_mode: bool,
 ) {
     // Note: Preview is calculated separately in handle_viewport_input
     // to continue showing during drag operations
@@ -1364,9 +1371,10 @@ fn paint_terrain_tile(
             level_id,
             layer_idx,
             terrain_set_id,
+            full_tile_mode,
         );
     }
-    // Finally check for legacy 47-tile terrains
+    // Finally check for legacy 47-tile terrains (no full-tile mode for legacy)
     else if let Some(terrain_id) = editor_state.selected_terrain {
         paint_legacy_terrain_tile(
             editor_state,
@@ -1412,6 +1420,7 @@ fn get_paint_targets_along_line(
 
 /// Paint using the new Tiled-style terrain set system
 /// Uses line interpolation for continuous drag painting and target-based deduplication
+/// If full_tile_mode is true (Ctrl held), paints all 8 positions of the center tile
 fn paint_terrain_set_tile(
     editor_state: &mut EditorState,
     project: &mut Project,
@@ -1422,6 +1431,7 @@ fn paint_terrain_set_tile(
     level_id: uuid::Uuid,
     layer_idx: usize,
     terrain_set_id: uuid::Uuid,
+    full_tile_mode: bool,
 ) {
     let Some(terrain_idx) = editor_state.selected_terrain_in_set else {
         return;
@@ -1440,12 +1450,54 @@ fn paint_terrain_set_tile(
         .map(|t| t.tile_size as f32)
         .unwrap_or(32.0);
 
-    // Get all paint targets along line from last position to current position
-    // This ensures continuous painting even when dragging quickly
-    let paint_targets = if let Some(last_pos) = input_state.last_paint_world_pos {
+    // Get paint targets based on mode
+    let paint_targets = if full_tile_mode {
+        // Full-tile mode: paint all 8 positions (4 corners + 4 edges) of the center tile
+        // This fills the tile completely and updates all 8 surrounding neighbors
+        let tile_x = (world_pos.x / tile_size).floor() as u32;
+        let tile_y = (world_pos.y / tile_size).floor() as u32;
+
+        vec![
+            // 4 corners of the tile
+            bevy_map_autotile::PaintTarget::Corner {
+                corner_x: tile_x,
+                corner_y: tile_y,
+            },
+            bevy_map_autotile::PaintTarget::Corner {
+                corner_x: tile_x + 1,
+                corner_y: tile_y,
+            },
+            bevy_map_autotile::PaintTarget::Corner {
+                corner_x: tile_x,
+                corner_y: tile_y + 1,
+            },
+            bevy_map_autotile::PaintTarget::Corner {
+                corner_x: tile_x + 1,
+                corner_y: tile_y + 1,
+            },
+            // 4 edges of the tile
+            bevy_map_autotile::PaintTarget::HorizontalEdge {
+                tile_x,
+                edge_y: tile_y,
+            },
+            bevy_map_autotile::PaintTarget::HorizontalEdge {
+                tile_x,
+                edge_y: tile_y + 1,
+            },
+            bevy_map_autotile::PaintTarget::VerticalEdge {
+                edge_x: tile_x,
+                tile_y,
+            },
+            bevy_map_autotile::PaintTarget::VerticalEdge {
+                edge_x: tile_x + 1,
+                tile_y,
+            },
+        ]
+    } else if let Some(last_pos) = input_state.last_paint_world_pos {
+        // Normal mode with drag: interpolate along line
         get_paint_targets_along_line(last_pos, world_pos, tile_size, terrain_set.set_type)
     } else {
-        // First paint of stroke - just paint at current position
+        // Normal mode, first paint: just paint at current position
         vec![bevy_map_autotile::get_paint_target(
             world_pos.x,
             world_pos.y,
@@ -1530,13 +1582,18 @@ fn paint_terrain_set_tile(
         let snapshot_region =
             capture_tile_region(tiles, level_width, level_height, center_x, center_y, 2);
 
-        bevy_map_autotile::paint_terrain_at_target(
+        // Enable debug logging for autotiling to trace algorithm decisions
+        // Set to true to see detailed constraint/tile matching logs (causes slowdown!)
+        const AUTOTILE_DEBUG: bool = false;
+
+        bevy_map_autotile::paint_terrain_at_target_with_debug(
             tiles,
             level_width,
             level_height,
             *paint_target,
             &terrain_set,
             terrain_idx,
+            AUTOTILE_DEBUG,
         );
 
         // Track changes for undo

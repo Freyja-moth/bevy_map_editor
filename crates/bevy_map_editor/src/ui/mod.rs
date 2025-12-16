@@ -948,6 +948,25 @@ fn render_ui(
     // Handle tileset deletion
     if let Some(tileset_id) = tree_view_result.delete_tileset {
         project.tilesets.retain(|t| t.id != tileset_id);
+
+        // Cascade delete: remove terrain sets that used this tileset
+        let removed_count = project
+            .autotile_config
+            .terrain_sets
+            .iter()
+            .filter(|ts| ts.tileset_id == tileset_id)
+            .count();
+        project
+            .autotile_config
+            .terrain_sets
+            .retain(|ts| ts.tileset_id != tileset_id);
+        if removed_count > 0 {
+            bevy::log::info!(
+                "Cascade deleted {} terrain set(s) associated with deleted tileset",
+                removed_count
+            );
+        }
+
         if matches!(editor_state.selection, Selection::Tileset(id) if id == tileset_id) {
             editor_state.selection = Selection::None;
         }

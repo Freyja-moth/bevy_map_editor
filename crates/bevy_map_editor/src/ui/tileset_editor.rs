@@ -112,7 +112,7 @@ fn get_tile_zone(local_x: f32, local_y: f32, set_type: TerrainSetType) -> Option
                 (1, 2) => Some(5), // Bottom
                 (0, 2) => Some(6), // BL
                 (0, 1) => Some(7), // Left
-                (1, 1) => None,    // Center - not clickable
+                (1, 1) => None, // Center zone is not clickable (no center_terrain in Tiled)
                 _ => None,
             }
         }
@@ -157,6 +157,7 @@ fn draw_terrain_overlays(
 ) {
     let position_count = set_type.position_count();
 
+    // Draw edge/corner positions
     for pos in 0..position_count {
         if let Some(terrain_idx) = terrain_data.get(pos) {
             if let Some(&color) = terrain_colors.get(terrain_idx) {
@@ -178,6 +179,7 @@ fn draw_terrain_overlays(
             }
         }
     }
+
 }
 
 /// Draw a Tiled-style corner overlay with curved inner boundary.
@@ -400,32 +402,11 @@ fn draw_mixed_overlay(painter: &egui::Painter, rect: egui::Rect, position: usize
         5 => egui::Rect::from_min_size(egui::pos2(left + w, top + 2.0 * h), egui::vec2(w, h)), // Bottom
         6 => egui::Rect::from_min_size(egui::pos2(left, top + 2.0 * h), egui::vec2(w, h)),     // BL
         7 => egui::Rect::from_min_size(egui::pos2(left, top + h), egui::vec2(w, h)), // Left
+        8 => egui::Rect::from_min_size(egui::pos2(left + w, top + h), egui::vec2(w, h)), // Center
         _ => return,
     };
 
     painter.rect_filled(cell_rect, 0.0, color);
-}
-
-/// Draw grayed-out center indicator for Mixed terrain sets
-/// Shows that the center cell is not clickable (Tiled-compatible behavior)
-fn draw_mixed_center_indicator(painter: &egui::Painter, rect: egui::Rect) {
-    let w = rect.width() / 3.0;
-    let h = rect.height() / 3.0;
-    let left = rect.left();
-    let top = rect.top();
-
-    // Center cell is at (1, 1) in the 3x3 grid
-    let center_rect = egui::Rect::from_min_size(egui::pos2(left + w, top + h), egui::vec2(w, h));
-
-    // Draw a subtle X pattern to indicate non-clickable
-    let gray = Color32::from_rgba_unmultiplied(128, 128, 128, 60);
-    let tl = center_rect.left_top();
-    let tr = center_rect.right_top();
-    let bl = center_rect.left_bottom();
-    let br = center_rect.right_bottom();
-
-    painter.line_segment([tl, br], egui::Stroke::new(1.0, gray));
-    painter.line_segment([tr, bl], egui::Stroke::new(1.0, gray));
 }
 
 /// Draw hover highlight for the currently hovered zone within a tile.
@@ -697,7 +678,7 @@ fn render_terrain_sets_tab(
 
                         // Instructions based on terrain set type
                         ui.separator();
-                        ui.small("Click on tile corners/edges to paint terrain.");
+                        ui.small("Click on tile zones to paint terrain.");
                         ui.small("Ctrl+click to clear a position.");
                         ui.add_space(4.0);
                         match terrain_set.set_type {
@@ -708,7 +689,7 @@ fn render_terrain_sets_tab(
                                 ui.small("Edge mode: 4 zones per tile (edges)");
                             }
                             TerrainSetType::Mixed => {
-                                ui.small("Mixed mode: 8 zones per tile");
+                                ui.small("Mixed mode: 8 zones (4 corners + 4 edges)");
                             }
                         }
                     }
@@ -875,10 +856,6 @@ fn render_tileset_with_terrain_overlay(
                             );
                         }
 
-                        // Draw center indicator for Mixed terrain (shows it's not clickable)
-                        if st == TerrainSetType::Mixed {
-                            draw_mixed_center_indicator(ui.painter(), rect);
-                        }
                     }
 
                     // Draw thin border to show tile boundaries

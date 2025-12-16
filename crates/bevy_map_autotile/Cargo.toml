@@ -16,6 +16,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
 rand = { version = "0.8", features = ["small_rng"] }
+log = "0.4"
 
 [features]
 default = []
