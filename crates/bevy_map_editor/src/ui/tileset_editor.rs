@@ -18,7 +18,6 @@ use crate::project::Project;
 use crate::EditorState;
 
 /// State for the tileset editor
-#[derive(Default)]
 pub struct TilesetEditorState {
     pub selected_tab: TilesetEditorTab,
     pub selected_image_idx: Option<usize>,
@@ -26,6 +25,20 @@ pub struct TilesetEditorState {
     pub selected_terrain_for_assignment: Option<usize>,
     /// Selected tile for property editing
     pub selected_tile_for_properties: Option<u32>,
+    /// Zoom level for terrain tile display (1.0 = 32px, 2.0 = 64px, etc.)
+    pub terrain_tile_zoom: f32,
+}
+
+impl Default for TilesetEditorState {
+    fn default() -> Self {
+        Self {
+            selected_tab: TilesetEditorTab::default(),
+            selected_image_idx: None,
+            selected_terrain_for_assignment: None,
+            selected_tile_for_properties: None,
+            terrain_tile_zoom: 1.0, // Default to 1x zoom (32px tiles)
+        }
+    }
 }
 
 // ============================================================================
@@ -112,7 +125,7 @@ fn get_tile_zone(local_x: f32, local_y: f32, set_type: TerrainSetType) -> Option
                 (1, 2) => Some(5), // Bottom
                 (0, 2) => Some(6), // BL
                 (0, 1) => Some(7), // Left
-                (1, 1) => None, // Center zone is not clickable (no center_terrain in Tiled)
+                (1, 1) => Some(8), // Center zone - visual marker only, doesn't affect Wang matching
                 _ => None,
             }
         }
@@ -180,6 +193,16 @@ fn draw_terrain_overlays(
         }
     }
 
+    // Draw center for Mixed sets (position 8) - visual marker only
+    if set_type == TerrainSetType::Mixed {
+        if let Some(terrain_idx) = terrain_data.get(8) {
+            if let Some(&color) = terrain_colors.get(terrain_idx) {
+                let overlay_color =
+                    Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 180);
+                draw_mixed_overlay(painter, rect, 8, overlay_color);
+            }
+        }
+    }
 }
 
 /// Draw a Tiled-style corner overlay with curved inner boundary.
@@ -522,7 +545,7 @@ pub fn render_tileset_editor(
             // Tab content
             match editor_state.tileset_editor_state.selected_tab {
                 TilesetEditorTab::Images => {
-                    render_images_tab(ui, editor_state, project);
+                    render_images_tab(ui, editor_state, project, cache);
                 }
                 TilesetEditorTab::TerrainSets => {
                     render_terrain_sets_tab(ui, editor_state, project, cache);
@@ -537,7 +560,12 @@ pub fn render_tileset_editor(
     editor_state.show_tileset_editor = is_open;
 }
 
-fn render_images_tab(ui: &mut egui::Ui, editor_state: &mut EditorState, project: &mut Project) {
+fn render_images_tab(
+    ui: &mut egui::Ui,
+    editor_state: &mut EditorState,
+    project: &mut Project,
+    cache: Option<&TilesetTextureCache>,
+) {
     let Some(tileset_id) = editor_state.selected_tileset else {
         ui.label("No tileset selected");
         return;
@@ -551,15 +579,34 @@ fn render_images_tab(ui: &mut egui::Ui, editor_state: &mut EditorState, project:
     ui.heading("Images");
     ui.separator();
 
-    // List images
+    // List images with previews
     for (idx, image) in tileset.images.iter().enumerate() {
         ui.horizontal(|ui| {
-            let selected = editor_state.tileset_editor_state.selected_image_idx == Some(idx);
-            if ui.selectable_label(selected, &image.name).clicked() {
-                editor_state.tileset_editor_state.selected_image_idx = Some(idx);
+            // Image preview thumbnail
+            if let Some(cache) = cache {
+                if let Some((_, texture_id, width, height)) = cache.loaded.get(&image.id) {
+                    // Scale to fit a reasonable preview size (max 64px)
+                    let max_size = 64.0;
+                    let scale = (max_size / width.max(*height)).min(1.0);
+                    let preview_size = egui::vec2(width * scale, height * scale);
+
+                    ui.image(egui::load::SizedTexture::new(*texture_id, preview_size));
+                } else {
+                    // Placeholder while loading
+                    ui.add_sized([64.0, 64.0], egui::Label::new("Loading..."));
+                }
             }
-            ui.label(format!("{}x{} tiles", image.columns, image.rows));
+
+            // Image info (name + dimensions)
+            ui.vertical(|ui| {
+                let selected = editor_state.tileset_editor_state.selected_image_idx == Some(idx);
+                if ui.selectable_label(selected, &image.name).clicked() {
+                    editor_state.tileset_editor_state.selected_image_idx = Some(idx);
+                }
+                ui.small(format!("{}x{} tiles", image.columns, image.rows));
+            });
         });
+        ui.add_space(4.0);
     }
 
     ui.separator();
@@ -588,139 +635,156 @@ fn render_terrain_sets_tab(
         .map(|t| (t.tile_size, t.images.clone(), !t.images.is_empty()));
 
     // Split into left panel (terrain list) and right panel (tileset preview)
-    // Using columns() for proper space distribution like the animation editor
-    ui.columns(2, |columns| {
-        // Left column: Terrain set and terrain list (with scroll area to prevent clipping)
-        egui::ScrollArea::vertical()
-            .auto_shrink([false, false])
-            .show(&mut columns[0], |ui| {
-                ui.heading("Terrain Sets");
+    // Using resizable SidePanel for better UX
+    egui::SidePanel::left("terrain_list_panel")
+        .resizable(true)
+        .default_width(250.0)
+        .min_width(150.0)
+        .max_width(400.0)
+        .show_inside(ui, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.heading("Terrain Sets");
 
-                // List terrain sets for this tileset
-                let terrain_sets: Vec<_> = project
-                    .autotile_config
-                    .terrain_sets
-                    .iter()
-                    .filter(|ts| ts.tileset_id == tileset_id)
-                    .map(|ts| (ts.id, ts.name.clone(), ts.set_type, ts.terrains.len()))
-                    .collect();
+                    // List terrain sets for this tileset
+                    let terrain_sets: Vec<_> = project
+                        .autotile_config
+                        .terrain_sets
+                        .iter()
+                        .filter(|ts| ts.tileset_id == tileset_id)
+                        .map(|ts| (ts.id, ts.name.clone(), ts.set_type, ts.terrains.len()))
+                        .collect();
 
-                for (ts_id, name, set_type, terrain_count) in &terrain_sets {
-                    ui.horizontal(|ui| {
-                        let selected = editor_state.selected_terrain_set == Some(*ts_id);
-                        if ui.selectable_label(selected, name).clicked() {
-                            editor_state.selected_terrain_set = Some(*ts_id);
-                            editor_state
-                                .tileset_editor_state
-                                .selected_terrain_for_assignment = None;
-                        }
-                        ui.small(format!("{:?} ({})", set_type, terrain_count));
-                    });
-                }
-
-                ui.separator();
-
-                ui.horizontal(|ui| {
-                    if ui.button("+ New Set").clicked() {
-                        editor_state.show_new_terrain_set_dialog = true;
+                    for (ts_id, name, set_type, terrain_count) in &terrain_sets {
+                        ui.horizontal(|ui| {
+                            let selected = editor_state.selected_terrain_set == Some(*ts_id);
+                            if ui.selectable_label(selected, name).clicked() {
+                                editor_state.selected_terrain_set = Some(*ts_id);
+                                editor_state
+                                    .tileset_editor_state
+                                    .selected_terrain_for_assignment = None;
+                            }
+                            ui.small(format!("{:?} ({})", set_type, terrain_count));
+                        });
                     }
-                });
 
-                // If a terrain set is selected, show its terrains
-                if let Some(ts_id) = editor_state.selected_terrain_set {
-                    if let Some(terrain_set) = project.autotile_config.get_terrain_set(ts_id) {
-                        ui.separator();
-                        ui.heading("Terrains");
+                    ui.separator();
 
-                        // Terrain list with selection
-                        for (idx, terrain) in terrain_set.terrains.iter().enumerate() {
+                    ui.horizontal(|ui| {
+                        if ui.button("+ New Set").clicked() {
+                            editor_state.show_new_terrain_set_dialog = true;
+                        }
+                    });
+
+                    // If a terrain set is selected, show its terrains
+                    if let Some(ts_id) = editor_state.selected_terrain_set {
+                        if let Some(terrain_set) = project.autotile_config.get_terrain_set(ts_id) {
+                            ui.separator();
+                            ui.heading("Terrains");
+
+                            // Terrain list with selection
+                            for (idx, terrain) in terrain_set.terrains.iter().enumerate() {
+                                ui.horizontal(|ui| {
+                                    let color = terrain_color_to_egui(&terrain.color);
+                                    let selected = editor_state
+                                        .tileset_editor_state
+                                        .selected_terrain_for_assignment
+                                        == Some(idx);
+
+                                    // Color swatch
+                                    let (rect, _) = ui.allocate_exact_size(
+                                        egui::vec2(16.0, 16.0),
+                                        egui::Sense::hover(),
+                                    );
+                                    ui.painter().rect_filled(rect, 2.0, color);
+
+                                    // Terrain name with selection
+                                    if ui.selectable_label(selected, &terrain.name).clicked() {
+                                        editor_state
+                                            .tileset_editor_state
+                                            .selected_terrain_for_assignment = Some(idx);
+                                    }
+                                });
+                            }
+
+                            // Buttons
+                            ui.separator();
                             ui.horizontal(|ui| {
-                                let color = terrain_color_to_egui(&terrain.color);
-                                let selected = editor_state
+                                if ui.button("+ Add Terrain").clicked() {
+                                    editor_state.show_add_terrain_to_set_dialog = true;
+                                }
+                                if editor_state
                                     .tileset_editor_state
                                     .selected_terrain_for_assignment
-                                    == Some(idx);
-
-                                // Color swatch
-                                let (rect, _) = ui.allocate_exact_size(
-                                    egui::vec2(16.0, 16.0),
-                                    egui::Sense::hover(),
-                                );
-                                ui.painter().rect_filled(rect, 2.0, color);
-
-                                // Terrain name with selection
-                                if ui.selectable_label(selected, &terrain.name).clicked() {
-                                    editor_state
-                                        .tileset_editor_state
-                                        .selected_terrain_for_assignment = Some(idx);
+                                    .is_some()
+                                {
+                                    if ui.button("Clear Selection").clicked() {
+                                        editor_state
+                                            .tileset_editor_state
+                                            .selected_terrain_for_assignment = None;
+                                    }
                                 }
                             });
-                        }
 
-                        // Buttons
-                        ui.separator();
-                        ui.horizontal(|ui| {
-                            if ui.button("+ Add Terrain").clicked() {
-                                editor_state.show_add_terrain_to_set_dialog = true;
-                            }
-                            if editor_state
-                                .tileset_editor_state
-                                .selected_terrain_for_assignment
-                                .is_some()
-                            {
-                                if ui.button("Clear Selection").clicked() {
-                                    editor_state
-                                        .tileset_editor_state
-                                        .selected_terrain_for_assignment = None;
+                            // Instructions based on terrain set type
+                            ui.separator();
+                            ui.small("Click on tile zones to paint terrain.");
+                            ui.small("Ctrl+click to clear a position.");
+                            ui.add_space(4.0);
+                            match terrain_set.set_type {
+                                TerrainSetType::Corner => {
+                                    ui.small("Corner mode: 4 zones per tile (corners)");
                                 }
-                            }
-                        });
-
-                        // Instructions based on terrain set type
-                        ui.separator();
-                        ui.small("Click on tile zones to paint terrain.");
-                        ui.small("Ctrl+click to clear a position.");
-                        ui.add_space(4.0);
-                        match terrain_set.set_type {
-                            TerrainSetType::Corner => {
-                                ui.small("Corner mode: 4 zones per tile (corners)");
-                            }
-                            TerrainSetType::Edge => {
-                                ui.small("Edge mode: 4 zones per tile (edges)");
-                            }
-                            TerrainSetType::Mixed => {
-                                ui.small("Mixed mode: 8 zones (4 corners + 4 edges)");
+                                TerrainSetType::Edge => {
+                                    ui.small("Edge mode: 4 zones per tile (edges)");
+                                }
+                                TerrainSetType::Mixed => {
+                                    ui.small("Mixed mode: 8 zones (4 corners + 4 edges)");
+                                }
                             }
                         }
                     }
-                }
-            });
-
-        // Right column: Tileset preview with terrain overlays
-        columns[1].vertical(|ui| {
-            ui.heading("Tile Assignments");
-
-            if let Some((tile_size, images, has_images)) = tileset_data.clone() {
-                if !has_images {
-                    ui.label("No images in tileset");
-                } else {
-                    // Use ScrollArea with available height
-                    egui::ScrollArea::both()
-                        .auto_shrink([false, false])
-                        .show(ui, |ui| {
-                            render_tileset_with_terrain_overlay(
-                                ui,
-                                editor_state,
-                                project,
-                                tileset_id,
-                                tile_size,
-                                &images,
-                                cache,
-                            );
-                        });
-                }
-            }
+                });
         });
+
+    // Right side: Tileset preview with terrain overlays (fills remaining space)
+    egui::CentralPanel::default().show_inside(ui, |ui| {
+        // Header with zoom slider
+        ui.horizontal(|ui| {
+            ui.heading("Tile Assignments");
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add(
+                    egui::Slider::new(
+                        &mut editor_state.tileset_editor_state.terrain_tile_zoom,
+                        0.5..=3.0,
+                    )
+                    .text("Zoom")
+                    .step_by(0.25),
+                );
+            });
+        });
+
+        if let Some((tile_size, images, has_images)) = tileset_data.clone() {
+            if !has_images {
+                ui.label("No images in tileset");
+            } else {
+                // Use ScrollArea with available height
+                egui::ScrollArea::both()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        render_tileset_with_terrain_overlay(
+                            ui,
+                            editor_state,
+                            project,
+                            tileset_id,
+                            tile_size,
+                            &images,
+                            cache,
+                        );
+                    });
+            }
+        }
     });
 }
 
@@ -745,8 +809,8 @@ fn render_tileset_with_terrain_overlay(
     images: &[bevy_map_core::TilesetImage],
     cache: Option<&TilesetTextureCache>,
 ) {
-    // Larger display size for easier clicking on corners/edges
-    let tile_display_size = 48.0f32;
+    // Display size based on zoom level (base 32px * zoom)
+    let tile_display_size = 32.0 * editor_state.tileset_editor_state.terrain_tile_zoom;
     let display_size = egui::vec2(tile_display_size, tile_display_size);
     let mut virtual_offset = 0u32;
 
@@ -947,6 +1011,7 @@ fn render_tileset_with_terrain_overlay(
                                     5 => "Bottom",
                                     6 => "Bottom-Left",
                                     7 => "Left",
+                                    8 => "Center",
                                     _ => "Unknown",
                                 },
                             };

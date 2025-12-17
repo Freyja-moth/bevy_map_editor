@@ -1172,6 +1172,126 @@ pub fn paint_terrain_at_target(
     );
 }
 
+/// Paint terrain at multiple targets in a single batched operation (like Tiled's approach)
+///
+/// This is much more efficient than calling paint_terrain_at_target() multiple times
+/// because it uses a single WangFiller instance and processes all targets in one pass:
+/// 1. ONE WangFiller allocation (instead of N)
+/// 2. ONE constraint building phase (instead of N)
+/// 3. ONE tile placement + propagation phase (instead of N)
+/// 4. ONE corrections phase (instead of N)
+///
+/// For full-tile mode (8 targets), this reduces allocations from ~32 to ~4.
+pub fn paint_terrain_at_targets(
+    tiles: &mut [Option<u32>],
+    width: u32,
+    height: u32,
+    targets: &[PaintTarget],
+    terrain_set: &TerrainSet,
+    terrain_index: usize,
+) {
+    if targets.is_empty() {
+        return;
+    }
+
+    let color = (terrain_index + 1) as u8;
+
+    // Create deterministic seed from first target position
+    let seed = match targets[0] {
+        PaintTarget::Corner { corner_x, corner_y } => {
+            (corner_x as u64) << 32 | (corner_y as u64)
+        }
+        PaintTarget::HorizontalEdge { tile_x, edge_y } => {
+            (tile_x as u64) << 32 | (edge_y as u64) | 0x1000_0000_0000_0000
+        }
+        PaintTarget::VerticalEdge { edge_x, tile_y } => {
+            (edge_x as u64) << 32 | (tile_y as u64) | 0x2000_0000_0000_0000
+        }
+    };
+
+    let mut filler = WangFiller::with_seed(terrain_set, seed);
+    let mut region: Vec<(i32, i32)> = Vec::new();
+
+    // Queue all constraints for all targets (like Tiled's setWangIndex pattern)
+    for target in targets {
+        match *target {
+            PaintTarget::Corner { corner_x, corner_y } => {
+                let cx = corner_x as i32;
+                let cy = corner_y as i32;
+
+                // Corner affects 4 tiles with specific corner indices
+                let affected: [(i32, i32, usize); 4] = [
+                    (cx - 1, cy - 1, 1), // Tile below-left, TopRight corner
+                    (cx, cy - 1, 7),     // Tile below-right, TopLeft corner
+                    (cx - 1, cy, 3),     // Tile above-left, BottomRight corner
+                    (cx, cy, 5),         // Tile above-right, BottomLeft corner
+                ];
+
+                for &(tx, ty, corner_idx) in &affected {
+                    if tx >= 0 && ty >= 0 && tx < width as i32 && ty < height as i32 {
+                        let cell = filler.get_cell_mut(tx, ty);
+                        cell.mask[corner_idx] = true;
+                        cell.desired.colors[corner_idx] = color;
+
+                        if !region.contains(&(tx, ty)) {
+                            region.push((tx, ty));
+                        }
+                    }
+                }
+            }
+            PaintTarget::HorizontalEdge { tile_x, edge_y } => {
+                let tx = tile_x as i32;
+                let ey = edge_y as i32;
+
+                // Edge affects 2 tiles
+                let affected: [(i32, i32, usize); 2] = [
+                    (tx, ey - 1, 0), // Tile below edge, Top
+                    (tx, ey, 4),     // Tile above edge, Bottom
+                ];
+
+                for &(x, y, edge_idx) in &affected {
+                    if x >= 0 && y >= 0 && x < width as i32 && y < height as i32 {
+                        let cell = filler.get_cell_mut(x, y);
+                        cell.mask[edge_idx] = true;
+                        cell.desired.colors[edge_idx] = color;
+
+                        if !region.contains(&(x, y)) {
+                            region.push((x, y));
+                        }
+                    }
+                }
+            }
+            PaintTarget::VerticalEdge { edge_x, tile_y } => {
+                let ex = edge_x as i32;
+                let ty = tile_y as i32;
+
+                // Edge affects 2 tiles
+                let affected: [(i32, i32, usize); 2] = [
+                    (ex - 1, ty, 2), // Tile left of edge, Right
+                    (ex, ty, 6),     // Tile right of edge, Left
+                ];
+
+                for &(x, y, edge_idx) in &affected {
+                    if x >= 0 && y >= 0 && x < width as i32 && y < height as i32 {
+                        let cell = filler.get_cell_mut(x, y);
+                        cell.mask[edge_idx] = true;
+                        cell.desired.colors[edge_idx] = color;
+
+                        if !region.contains(&(x, y)) {
+                            region.push((x, y));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Single apply() processes everything at once (like Tiled)
+    if !region.is_empty() {
+        filler.apply(tiles, width, height, &region);
+    }
+}
+
 /// Update a single tile based on its neighbors
 pub fn update_tile_with_neighbors(
     tiles: &mut [Option<u32>],
@@ -1329,15 +1449,6 @@ pub fn preview_terrain_at_targets(
         return Vec::new();
     }
 
-    // Snapshot original tiles in combined affected region
-    let original: HashMap<(i32, i32), Option<u32>> = all_affected
-        .iter()
-        .map(|&(x, y)| {
-            let idx = (y as u32 * width + x as u32) as usize;
-            ((x, y), tiles.get(idx).copied().flatten())
-        })
-        .collect();
-
     // Clone and apply all targets
     let mut preview_tiles = tiles.to_vec();
     for target in targets {
@@ -1351,17 +1462,15 @@ pub fn preview_terrain_at_targets(
         );
     }
 
-    // Find changed tiles
+    // Always show brush footprint (like Tiled), not just tiles that would change
+    // This ensures preview stays visible during drag even when tiles are already painted
     let mut result = Vec::new();
     for (x, y) in all_affected {
         let idx = (y as u32 * width + x as u32) as usize;
-        let old = original.get(&(x, y)).copied().flatten();
         let new = preview_tiles.get(idx).copied().flatten();
 
-        if new != old {
-            if let Some(tile_id) = new {
-                result.push(((x, y), tile_id));
-            }
+        if let Some(tile_id) = new {
+            result.push(((x, y), tile_id));
         }
     }
 

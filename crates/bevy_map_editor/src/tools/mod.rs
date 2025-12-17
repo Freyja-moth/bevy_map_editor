@@ -104,8 +104,72 @@ fn capture_tile_region(
     snapshot
 }
 
+/// Capture a snapshot of tiles in a rectangular bounds for undo tracking
+fn capture_tile_region_bounds(
+    tiles: &[Option<u32>],
+    width: u32,
+    height: u32,
+    min_x: i32,
+    min_y: i32,
+    max_x: i32,
+    max_y: i32,
+) -> HashMap<(u32, u32), Option<u32>> {
+    let mut snapshot = HashMap::new();
+
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            if x >= 0 && y >= 0 && x < width as i32 && y < height as i32 {
+                let x = x as u32;
+                let y = y as u32;
+                let idx = (y * width + x) as usize;
+                let tile = tiles.get(idx).copied().flatten();
+                snapshot.insert((x, y), tile);
+            }
+        }
+    }
+
+    snapshot
+}
+
+/// Calculate the bounding box of all paint targets plus a buffer
+fn calculate_targets_bounds(
+    targets: &[bevy_map_autotile::PaintTarget],
+    buffer: i32,
+) -> (i32, i32, i32, i32) {
+    if targets.is_empty() {
+        return (0, 0, 0, 0);
+    }
+
+    let mut min_x = i32::MAX;
+    let mut min_y = i32::MAX;
+    let mut max_x = i32::MIN;
+    let mut max_y = i32::MIN;
+
+    for target in targets {
+        let (cx, cy) = match target {
+            bevy_map_autotile::PaintTarget::Corner { corner_x, corner_y } => {
+                (*corner_x as i32, *corner_y as i32)
+            }
+            bevy_map_autotile::PaintTarget::HorizontalEdge { tile_x, edge_y } => {
+                (*tile_x as i32, *edge_y as i32)
+            }
+            bevy_map_autotile::PaintTarget::VerticalEdge { edge_x, tile_y } => {
+                (*edge_x as i32, *tile_y as i32)
+            }
+        };
+
+        min_x = min_x.min(cx - buffer);
+        min_y = min_y.min(cy - buffer);
+        max_x = max_x.max(cx + buffer);
+        max_y = max_y.max(cy + buffer);
+    }
+
+    (min_x, min_y, max_x, max_y)
+}
+
 /// System to handle viewport input (painting, panning)
 fn handle_viewport_input(
+    mut commands: Commands,
     mut contexts: EguiContexts,
     mut editor_state: ResMut<EditorState>,
     mut project: ResMut<Project>,
@@ -478,6 +542,7 @@ fn handle_viewport_input(
         match editor_state.current_tool {
             EditorTool::Paint => {
                 paint_tile(
+                    &mut commands,
                     &mut editor_state,
                     &mut project,
                     &mut render_state,
@@ -490,6 +555,7 @@ fn handle_viewport_input(
                 let full_tile_mode = keyboard.pressed(KeyCode::ControlLeft)
                     || keyboard.pressed(KeyCode::ControlRight);
                 paint_terrain_tile(
+                    &mut commands,
                     &mut editor_state,
                     &mut project,
                     &mut render_state,
@@ -501,6 +567,7 @@ fn handle_viewport_input(
             }
             EditorTool::Erase => {
                 erase_tile(
+                    &mut commands,
                     &mut editor_state,
                     &mut project,
                     &mut render_state,
@@ -891,6 +958,7 @@ fn cancel_move_operation(editor_state: &mut EditorState, project: &mut Project) 
 
 /// Paint a tile at the given world position
 fn paint_tile(
+    commands: &mut Commands,
     editor_state: &mut EditorState,
     project: &mut Project,
     render_state: &mut RenderState,
@@ -1011,13 +1079,24 @@ fn paint_tile(
         }
     }
 
-    render_state.needs_rebuild = true;
+    // Update tile rendering incrementally (instead of full rebuild)
+    crate::render::update_tile(
+        commands,
+        render_state,
+        project,
+        level_id,
+        layer_idx,
+        tile_x,
+        tile_y,
+        Some(tile_index),
+    );
     editor_state.is_painting = true;
     editor_state.last_painted_tile = Some((tile_x, tile_y));
 }
 
 /// Erase a tile at the given world position
 fn erase_tile(
+    commands: &mut Commands,
     editor_state: &mut EditorState,
     project: &mut Project,
     render_state: &mut RenderState,
@@ -1077,7 +1156,17 @@ fn erase_tile(
         }
     }
 
-    render_state.needs_rebuild = true;
+    // Update tile rendering incrementally (instead of full rebuild)
+    crate::render::update_tile(
+        commands,
+        render_state,
+        project,
+        level_id,
+        layer_idx,
+        tile_x,
+        tile_y,
+        None, // Erasing: set to None
+    );
     editor_state.is_painting = true;
     editor_state.last_painted_tile = Some((tile_x, tile_y));
 }
@@ -1350,6 +1439,7 @@ fn fill_area(
 /// Paint a terrain tile with autotiling at the given world position
 /// If full_tile_mode is true (Ctrl held), paints all 8 positions of the tile
 fn paint_terrain_tile(
+    commands: &mut Commands,
     editor_state: &mut EditorState,
     project: &mut Project,
     render_state: &mut RenderState,
@@ -1376,6 +1466,7 @@ fn paint_terrain_tile(
     // Check for Tiled-style terrain sets
     if let Some(terrain_set_id) = editor_state.selected_terrain_set {
         paint_terrain_set_tile(
+            commands,
             editor_state,
             project,
             render_state,
@@ -1391,6 +1482,7 @@ fn paint_terrain_tile(
     // Finally check for legacy 47-tile terrains (no full-tile mode for legacy)
     else if let Some(terrain_id) = editor_state.selected_terrain {
         paint_legacy_terrain_tile(
+            commands,
             editor_state,
             project,
             render_state,
@@ -1436,6 +1528,7 @@ fn get_paint_targets_along_line(
 /// Uses line interpolation for continuous drag painting and target-based deduplication
 /// If full_tile_mode is true (Ctrl held), paints all 8 positions of the center tile
 fn paint_terrain_set_tile(
+    commands: &mut Commands,
     editor_state: &mut EditorState,
     project: &mut Project,
     render_state: &mut RenderState,
@@ -1588,61 +1681,63 @@ fn paint_terrain_set_tile(
         return;
     };
 
-    // Paint all new targets
-    for paint_target in &new_targets {
-        // Calculate center coordinates for snapshot region
-        let (center_x, center_y): (i32, i32) = match paint_target {
-            bevy_map_autotile::PaintTarget::Corner { corner_x, corner_y } => {
-                (*corner_x as i32, *corner_y as i32)
-            }
-            bevy_map_autotile::PaintTarget::HorizontalEdge { tile_x, edge_y } => {
-                (*tile_x as i32, *edge_y as i32)
-            }
-            bevy_map_autotile::PaintTarget::VerticalEdge { edge_x, tile_y } => {
-                (*edge_x as i32, *tile_y as i32)
-            }
-        };
+    // Calculate unified bounding box for all targets (with buffer for corrections)
+    let (min_x, min_y, max_x, max_y) = calculate_targets_bounds(&new_targets, 2);
 
-        let snapshot_region =
-            capture_tile_region(tiles, level_width, level_height, center_x, center_y, 2);
+    // Take a single unified snapshot covering all targets (like Tiled)
+    let unified_snapshot =
+        capture_tile_region_bounds(tiles, level_width, level_height, min_x, min_y, max_x, max_y);
 
-        // Enable debug logging for autotiling to trace algorithm decisions
-        // Set to true to see detailed constraint/tile matching logs (causes slowdown!)
-        const AUTOTILE_DEBUG: bool = false;
+    // Paint all targets in ONE batched operation (like Tiled's approach)
+    // This uses a single WangFiller instead of creating 8 separate ones
+    bevy_map_autotile::paint_terrain_at_targets(
+        tiles,
+        level_width,
+        level_height,
+        &new_targets,
+        terrain_set,
+        terrain_idx,
+    );
 
-        bevy_map_autotile::paint_terrain_at_target_with_debug(
-            tiles,
-            level_width,
-            level_height,
-            *paint_target,
-            terrain_set,
-            terrain_idx,
-            AUTOTILE_DEBUG,
-        );
-
-        // Track changes for undo
-        for ((x, y), old_tile) in snapshot_region {
-            let idx = (y * level_width + x) as usize;
-            let new_tile = tiles.get(idx).copied().flatten();
-            if old_tile != new_tile {
-                if !stroke_tracker.changes.contains_key(&(x, y)) {
-                    stroke_tracker.changes.insert((x, y), (old_tile, new_tile));
-                } else {
-                    if let Some(change) = stroke_tracker.changes.get_mut(&(x, y)) {
-                        change.1 = new_tile;
-                    }
-                }
+    // Track all changes at once from unified snapshot
+    // Collect changed tiles for incremental rendering update
+    let mut changed_tiles = Vec::new();
+    for ((x, y), old_tile) in unified_snapshot {
+        let idx = (y * level_width + x) as usize;
+        let new_tile = tiles.get(idx).copied().flatten();
+        if old_tile != new_tile {
+            changed_tiles.push((x, y, new_tile));
+            if !stroke_tracker.changes.contains_key(&(x, y)) {
+                stroke_tracker.changes.insert((x, y), (old_tile, new_tile));
+            } else if let Some(change) = stroke_tracker.changes.get_mut(&(x, y)) {
+                change.1 = new_tile;
             }
         }
+    }
 
-        // Mark this target as painted for deduplication
+    // Mark all targets as painted for deduplication
+    for paint_target in &new_targets {
         input_state
             .painted_targets_this_stroke
             .insert(*paint_target);
     }
 
+    // Update tile rendering incrementally (like Tiled's approach)
+    // This updates only changed tiles instead of triggering a full rebuild
+    for (x, y, new_tile) in changed_tiles {
+        crate::render::update_tile(
+            commands,
+            render_state,
+            project,
+            level_id,
+            layer_idx,
+            x,
+            y,
+            new_tile,
+        );
+    }
+
     project.mark_dirty();
-    render_state.needs_rebuild = true;
     editor_state.is_painting = true;
 
     // Update last paint position for next frame's line interpolation
@@ -1651,6 +1746,7 @@ fn paint_terrain_set_tile(
 
 /// Paint using the legacy 47-tile blob terrain system
 fn paint_legacy_terrain_tile(
+    commands: &mut Commands,
     editor_state: &mut EditorState,
     project: &mut Project,
     render_state: &mut RenderState,
@@ -1744,10 +1840,13 @@ fn paint_legacy_terrain_tile(
                 stroke_tracker.description = "Paint Terrain".to_string();
             }
 
+            // Collect changed tiles for incremental update
+            let mut changed_tiles = Vec::new();
             for ((x, y), old_tile) in snapshot_region {
                 let idx = (y * level_width + x) as usize;
                 let new_tile = tiles.get(idx).copied().flatten();
                 if old_tile != new_tile {
+                    changed_tiles.push((x, y, new_tile));
                     if !stroke_tracker.changes.contains_key(&(x, y)) {
                         stroke_tracker.changes.insert((x, y), (old_tile, new_tile));
                     } else {
@@ -1757,11 +1856,24 @@ fn paint_legacy_terrain_tile(
                     }
                 }
             }
+
+            // Update tile rendering incrementally for each changed tile
+            for (x, y, new_tile) in changed_tiles {
+                crate::render::update_tile(
+                    commands,
+                    render_state,
+                    project,
+                    level_id,
+                    layer_idx,
+                    x,
+                    y,
+                    new_tile,
+                );
+            }
         }
     }
 
     project.mark_dirty();
-    render_state.needs_rebuild = true;
     editor_state.is_painting = true;
     editor_state.last_painted_tile = Some((tile_x_u32, tile_y_u32));
 }

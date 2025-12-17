@@ -116,26 +116,65 @@ impl Terrain {
     }
 }
 
-/// Terrain assignments for a single tile's corners/edges
+/// Terrain assignments for a single tile's corners/edges/center
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TileTerrainData {
     /// Terrain index at each position (None = no terrain assigned)
     /// For Corner: indices 0-3 (TL, TR, BL, BR)
     /// For Edge: indices 0-3 (Top, Right, Bottom, Left)
     /// For Mixed: indices 0-7 (TL, T, TR, R, BR, B, BL, L - clockwise from top-left)
-    pub terrains: [Option<usize>; 8],
+    ///            index 8 = Center (visual only, doesn't affect Wang matching)
+    #[serde(deserialize_with = "deserialize_terrains")]
+    pub terrains: [Option<usize>; 9],
+}
+
+/// Custom deserializer that handles both old 8-element and new 9-element terrain arrays
+fn deserialize_terrains<'de, D>(deserializer: D) -> Result<[Option<usize>; 9], D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{SeqAccess, Visitor};
+
+    struct TerrainsVisitor;
+
+    impl<'de> Visitor<'de> for TerrainsVisitor {
+        type Value = [Option<usize>; 9];
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("an array of 8 or 9 optional terrain indices")
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let mut terrains = [None; 9];
+            let mut i = 0;
+            while let Some(value) = seq.next_element()? {
+                if i < 9 {
+                    terrains[i] = value;
+                }
+                i += 1;
+            }
+            // If we read 8 elements (old format), the 9th stays None (center unassigned)
+            // If we read 9 elements (new format), all are populated
+            Ok(terrains)
+        }
+    }
+
+    deserializer.deserialize_seq(TerrainsVisitor)
 }
 
 impl TileTerrainData {
     pub fn new() -> Self {
         Self {
-            terrains: [None; 8],
+            terrains: [None; 9],
         }
     }
 
     /// Set terrain at a specific position
     pub fn set(&mut self, position: usize, terrain_index: Option<usize>) {
-        if position < 8 {
+        if position < 9 {
             self.terrains[position] = terrain_index;
         }
     }

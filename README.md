@@ -28,7 +28,7 @@ Autotiling is still a WIP while I get the algorithm right, but you can manually 
 Here's the Tileset Editor:
 ![Tileset Editor/Terrain](docs/images/tileset_editor.png)
 
-The below video shows some of the issues currently with autotiling, while I work on fixing them!
+The below video shows switching between corner/edge based autotiling and holding ctrl for full-tile autotiling
 
 ![Autotiling](docs/gifs/autotiling.gif)
 

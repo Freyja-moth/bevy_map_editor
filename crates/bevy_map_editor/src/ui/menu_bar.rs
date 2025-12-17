@@ -130,23 +130,33 @@ pub fn render_menu_bar(
                     editor_state.show_new_tileset_dialog = true;
                     ui.close();
                 }
-                ui.separator();
-                if ui.button("Schema Editor...").clicked() {
-                    editor_state.show_schema_editor = true;
-                    ui.close();
-                }
             });
 
             // Tools menu - Specialized editors
             ui.menu_button("Tools", |ui| {
-                // Note: Sprite Sheet Editor and Animation Editor are opened via context menu
-                // on specific sprite sheet assets in the tree view
+                // Graphics editors
                 if ui.button("Tileset Editor...").clicked() {
                     editor_state.show_tileset_editor = true;
                     ui.close();
                 }
+                if ui.button("Sprite Sheet Editor...").clicked() {
+                    editor_state.show_spritesheet_editor = true;
+                    ui.close();
+                }
+                if ui.button("Animation Editor...").clicked() {
+                    editor_state.show_animation_editor = true;
+                    ui.close();
+                }
+                ui.separator();
+                // Content editor
                 if ui.button("Dialogue Editor...").clicked() {
                     editor_state.show_dialogue_editor = true;
+                    ui.close();
+                }
+                ui.separator();
+                // Data editor
+                if ui.button("Schema Editor...").clicked() {
+                    editor_state.show_schema_editor = true;
                     ui.close();
                 }
             });
