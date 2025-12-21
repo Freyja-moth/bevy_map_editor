@@ -8,11 +8,6 @@
       "default_layer_types": []
     },
     "enums": {
-      "NpcType": [
-        "QuestGiver",
-        "LoreBased",
-        "Vendor"
-      ],
       "WeaponType": [
         "Sword",
         "Dagger",
@@ -21,6 +16,11 @@
       "ItemType": [
         "HealthPotion",
         "ManaPotion"
+      ],
+      "NpcType": [
+        "QuestGiver",
+        "LoreBased",
+        "Vendor"
       ]
     },
     "data_types": {
@@ -312,45 +312,6 @@
         }
       ],
       "tile_properties": {
-        "48": {
-          "collision": {
-            "shape": {
-              "type": "None"
-            },
-            "body_type": "Static",
-            "one_way": "None",
-            "layer": 0,
-            "mask": 0
-          },
-          "grid_width": 4,
-          "grid_height": 3
-        },
-        "2": {
-          "collision": {
-            "shape": {
-              "type": "None"
-            },
-            "body_type": "Static",
-            "one_way": "None",
-            "layer": 0,
-            "mask": 0
-          },
-          "grid_width": 2,
-          "grid_height": 2
-        },
-        "6": {
-          "collision": {
-            "shape": {
-              "type": "None"
-            },
-            "body_type": "Static",
-            "one_way": "None",
-            "layer": 0,
-            "mask": 0
-          },
-          "grid_width": 2,
-          "grid_height": 2
-        },
         "0": {
           "collision": {
             "shape": {
@@ -376,6 +337,45 @@
           },
           "grid_width": 2,
           "grid_height": 2
+        },
+        "2": {
+          "collision": {
+            "shape": {
+              "type": "None"
+            },
+            "body_type": "Static",
+            "one_way": "None",
+            "layer": 0,
+            "mask": 0
+          },
+          "grid_width": 2,
+          "grid_height": 2
+        },
+        "48": {
+          "collision": {
+            "shape": {
+              "type": "None"
+            },
+            "body_type": "Static",
+            "one_way": "None",
+            "layer": 0,
+            "mask": 0
+          },
+          "grid_width": 4,
+          "grid_height": 3
+        },
+        "6": {
+          "collision": {
+            "shape": {
+              "type": "None"
+            },
+            "body_type": "Static",
+            "one_way": "None",
+            "layer": 0,
+            "mask": 0
+          },
+          "grid_width": 2,
+          "grid_height": 2
         }
       },
       "path": "C:/Dev/Workspace/bevy_map_editor/examples/assets/tiles/TilesetNature.png",
@@ -390,125 +390,15 @@
           "id": "1d32ddd6-aa77-4338-a693-c42f4e9093fb",
           "type_name": "Item",
           "properties": {
-            "name": "Health Potion",
             "item_type": "HealthPotion",
-            "min_level": 0.0
+            "min_level": 0.0,
+            "name": "Health Potion"
           }
         }
       ]
     }
   },
   "levels": [
-    {
-      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "name": "example_level",
-      "width": 8,
-      "height": 8,
-      "layers": [
-        {
-          "name": "Ground",
-          "visible": true,
-          "data": {
-            "Tiles": {
-              "tileset_id": "8d169c19-e1c6-4a82-8263-5f2cc99c0b6a",
-              "tiles": [
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-              ]
-            }
-          }
-        },
-        {
-          "name": "Entities",
-          "visible": true,
-          "data": {
-            "Objects": {
-              "entities": [
-                "b6475bf7-2624-4612-8c1a-f889dc53846a"
-              ]
-            }
-          }
-        }
-      ],
-      "entities": [
-        {
-          "id": "b6475bf7-2624-4612-8c1a-f889dc53846a",
-          "type_name": "NPC",
-          "position": [
-            32.0,
-            48.0
-          ],
-          "properties": {
-            "dialogue": "00000000-0000-0000-0000-000000000003",
-            "name": "Merchant_With_Dialogue",
-            "items_for_sale": [],
-            "npc_type": "Vendor"
-          }
-        }
-      ]
-    },
     {
       "id": "c56d65c1-239a-45bb-b223-f9dffcfa59ac",
       "name": "example_autotile",
@@ -5551,31 +5441,31 @@
                 null
               ],
               "occupied_cells": {
-                "559": 509,
-                "270": 267,
-                "317": 267,
-                "370": 267,
-                "358": 257,
-                "510": 509,
-                "307": 257,
-                "260": 257,
-                "309": 257,
-                "560": 509,
-                "319": 267,
-                "310": 257,
-                "308": 257,
-                "258": 257,
-                "268": 267,
-                "359": 257,
-                "259": 257,
-                "367": 267,
-                "368": 267,
-                "369": 267,
-                "360": 257,
-                "318": 267,
-                "357": 257,
                 "320": 267,
-                "269": 267
+                "317": 267,
+                "510": 509,
+                "270": 267,
+                "359": 257,
+                "369": 267,
+                "560": 509,
+                "308": 257,
+                "318": 267,
+                "268": 267,
+                "319": 267,
+                "358": 257,
+                "310": 257,
+                "309": 257,
+                "259": 257,
+                "368": 267,
+                "360": 257,
+                "269": 267,
+                "367": 267,
+                "559": 509,
+                "370": 267,
+                "258": 257,
+                "260": 257,
+                "357": 257,
+                "307": 257
               }
             }
           }
@@ -5591,8 +5481,8 @@
           ],
           "properties": {
             "level": 0.0,
-            "name": "wolf_1",
-            "exp": 0.0
+            "exp": 0.0,
+            "name": "wolf_1"
           }
         },
         {
@@ -5603,8 +5493,8 @@
             568.0
           ],
           "properties": {
-            "exp": 0.0,
             "level": 0.0,
+            "exp": 0.0,
             "name": "wolf_2"
           }
         },
@@ -5632,9 +5522,9 @@
             "items_for_sale": [
               "1d32ddd6-aa77-4338-a693-c42f4e9093fb"
             ],
+            "name": "Vendor_With_Items",
             "dialogue": null,
-            "npc_type": "Vendor",
-            "name": "Vendor_With_Items"
+            "npc_type": "Vendor"
           }
         },
         {
@@ -5645,10 +5535,10 @@
             480.0
           ],
           "properties": {
-            "dialogue": null,
-            "items_for_sale": [],
+            "npc_type": "QuestGiver",
             "name": "QuestGiver_Joe",
-            "npc_type": "QuestGiver"
+            "items_for_sale": [],
+            "dialogue": null
           }
         },
         {
@@ -5659,10 +5549,10 @@
             320.0
           ],
           "properties": {
-            "npc_type": "QuestGiver",
-            "items_for_sale": [],
             "name": "WeaponTrainer_Jim",
-            "dialogue": null
+            "items_for_sale": [],
+            "dialogue": null,
+            "npc_type": "QuestGiver"
           }
         }
       ]
@@ -5700,41 +5590,28 @@
           }
         ],
         "tile_terrains": {
-          "203": {
+          "220": {
             "terrains": [
-              1,
-              1,
+              0,
+              0,
               0,
               1,
-              1,
-              1,
-              1,
-              1,
+              0,
+              0,
+              0,
+              0,
               1
             ]
           },
-          "227": {
+          "208": {
             "terrains": [
               0,
               1,
               0,
-              0,
-              0,
-              0,
-              0,
-              1,
-              1
-            ]
-          },
-          "184": {
-            "terrains": [
-              1,
-              1,
-              1,
               1,
               0,
               1,
-              0,
+              1,
               1,
               1
             ]
@@ -5752,54 +5629,28 @@
               1
             ]
           },
-          "201": {
+          "228": {
             "terrains": [
               0,
               1,
               0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              1
-            ]
-          },
-          "264": {
-            "terrains": [
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0
-            ]
-          },
-          "230": {
-            "terrains": [
-              1,
               1,
               0,
-              1,
               0,
-              1,
               0,
               1,
               1
             ]
           },
-          "200": {
+          "205": {
             "terrains": [
+              0,
+              1,
+              0,
+              0,
+              0,
               1,
               1,
-              0,
-              0,
-              0,
-              0,
-              0,
               1,
               1
             ]
@@ -5817,12 +5668,12 @@
               1
             ]
           },
-          "178": {
+          "159": {
             "terrains": [
-              1,
-              1,
               0,
               0,
+              0,
+              1,
               0,
               1,
               1,
@@ -5843,124 +5694,7 @@
               1
             ]
           },
-          "228": {
-            "terrains": [
-              0,
-              1,
-              0,
-              1,
-              0,
-              0,
-              0,
-              1,
-              1
-            ]
-          },
-          "183": {
-            "terrains": [
-              1,
-              1,
-              0,
-              0,
-              0,
-              1,
-              0,
-              1,
-              1
-            ]
-          },
-          "205": {
-            "terrains": [
-              0,
-              1,
-              0,
-              0,
-              0,
-              1,
-              1,
-              1,
-              1
-            ]
-          },
-          "207": {
-            "terrains": [
-              0,
-              1,
-              0,
-              1,
-              1,
-              1,
-              0,
-              1,
-              1
-            ]
-          },
-          "198": {
-            "terrains": [
-              0,
-              1,
-              1,
-              1,
-              0,
-              0,
-              0,
-              0,
-              1
-            ]
-          },
-          "206": {
-            "terrains": [
-              0,
-              1,
-              0,
-              1,
-              1,
-              1,
-              1,
-              1,
-              1
-            ]
-          },
-          "179": {
-            "terrains": [
-              0,
-              1,
-              0,
-              0,
-              0,
-              1,
-              0,
-              0,
-              1
-            ]
-          },
-          "132": {
-            "terrains": [
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null
-            ]
-          },
-          "223": {
-            "terrains": [
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null
-            ]
-          },
-          "177": {
+          "182": {
             "terrains": [
               1,
               1,
@@ -5968,7 +5702,7 @@
               1,
               1,
               1,
-              1,
+              0,
               1,
               1
             ]
@@ -5986,131 +5720,27 @@
               null
             ]
           },
-          "199": {
-            "terrains": [
-              1,
-              1,
-              1,
-              1,
-              0,
-              0,
-              0,
-              1,
-              1
-            ]
-          },
-          "248": {
-            "terrains": [
-              0,
-              1,
-              1,
-              1,
-              1,
-              1,
-              0,
-              1,
-              1
-            ]
-          },
-          "249": {
-            "terrains": [
-              0,
-              1,
-              0,
-              0,
-              0,
-              1,
-              0,
-              1,
-              1
-            ]
-          },
-          "163": {
-            "terrains": [
-              1,
-              1,
-              0,
-              1,
-              1,
-              1,
-              0,
-              1,
-              1
-            ]
-          },
-          "221": {
-            "terrains": [
-              0,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              1,
-              1
-            ]
-          },
-          "162": {
-            "terrains": [
-              0,
-              0,
-              0,
-              1,
-              0,
-              1,
-              0,
-              1,
-              1
-            ]
-          },
-          "224": {
+          "202": {
             "terrains": [
               0,
               1,
               0,
               1,
-              0,
-              0,
+              1,
+              1,
               0,
               0,
               1
             ]
           },
-          "181": {
-            "terrains": [
-              1,
-              1,
-              1,
-              1,
-              0,
-              1,
-              1,
-              1,
-              1
-            ]
-          },
-          "155": {
-            "terrains": [
-              0,
-              0,
-              0,
-              1,
-              1,
-              1,
-              1,
-              1,
-              1
-            ]
-          },
-          "250": {
+          "226": {
             "terrains": [
               0,
               1,
-              0,
+              1,
               1,
               0,
-              1,
+              0,
               0,
               1,
               1
@@ -6129,25 +5759,12 @@
               1
             ]
           },
-          "182": {
-            "terrains": [
-              1,
-              1,
-              1,
-              1,
-              1,
-              1,
-              0,
-              1,
-              1
-            ]
-          },
-          "226": {
+          "227": {
             "terrains": [
               0,
               1,
-              1,
-              1,
+              0,
+              0,
               0,
               0,
               0,
@@ -6155,50 +5772,11 @@
               1
             ]
           },
-          "220": {
-            "terrains": [
-              0,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              0,
-              1
-            ]
-          },
-          "247": {
+          "199": {
             "terrains": [
               1,
               1,
-              0,
               1,
-              0,
-              1,
-              1,
-              1,
-              1
-            ]
-          },
-          "180": {
-            "terrains": [
-              0,
-              1,
-              1,
-              1,
-              0,
-              1,
-              0,
-              0,
-              1
-            ]
-          },
-          "225": {
-            "terrains": [
-              1,
-              1,
-              0,
               1,
               0,
               0,
@@ -6207,9 +5785,9 @@
               1
             ]
           },
-          "185": {
+          "181": {
             "terrains": [
-              0,
+              1,
               1,
               1,
               1,
@@ -6220,16 +5798,55 @@
               1
             ]
           },
-          "176": {
+          "264": {
+            "terrains": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          "249": {
             "terrains": [
               0,
               1,
+              0,
+              0,
+              0,
               1,
+              0,
               1,
-              1,
+              1
+            ]
+          },
+          "179": {
+            "terrains": [
+              0,
               1,
               0,
               0,
+              0,
+              1,
+              0,
+              0,
+              1
+            ]
+          },
+          "250": {
+            "terrains": [
+              0,
+              1,
+              0,
+              1,
+              0,
+              1,
+              0,
+              1,
               1
             ]
           },
@@ -6272,11 +5889,102 @@
               1
             ]
           },
-          "229": {
+          "222": {
+            "terrains": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              1
+            ]
+          },
+          "176": {
             "terrains": [
               0,
               1,
               1,
+              1,
+              1,
+              1,
+              0,
+              0,
+              1
+            ]
+          },
+          "200": {
+            "terrains": [
+              1,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              1
+            ]
+          },
+          "203": {
+            "terrains": [
+              1,
+              1,
+              0,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ]
+          },
+          "201": {
+            "terrains": [
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "163": {
+            "terrains": [
+              1,
+              1,
+              0,
+              1,
+              1,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "183": {
+            "terrains": [
+              1,
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "162": {
+            "terrains": [
+              0,
+              0,
+              0,
               1,
               0,
               1,
@@ -6285,11 +5993,50 @@
               1
             ]
           },
-          "159": {
+          "207": {
+            "terrains": [
+              0,
+              1,
+              0,
+              1,
+              1,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "248": {
+            "terrains": [
+              0,
+              1,
+              1,
+              1,
+              1,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "155": {
             "terrains": [
               0,
               0,
               0,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ]
+          },
+          "185": {
+            "terrains": [
+              0,
+              1,
+              1,
               1,
               0,
               1,
@@ -6311,30 +6058,17 @@
               1
             ]
           },
-          "202": {
+          "223": {
             "terrains": [
-              0,
-              1,
-              0,
-              1,
-              1,
-              1,
-              0,
-              0,
-              1
-            ]
-          },
-          "222": {
-            "terrains": [
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              1,
-              1
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null
             ]
           },
           "204": {
@@ -6350,9 +6084,9 @@
               1
             ]
           },
-          "208": {
+          "247": {
             "terrains": [
-              0,
+              1,
               1,
               0,
               1,
@@ -6361,6 +6095,162 @@
               1,
               1,
               1
+            ]
+          },
+          "180": {
+            "terrains": [
+              0,
+              1,
+              1,
+              1,
+              0,
+              1,
+              0,
+              0,
+              1
+            ]
+          },
+          "178": {
+            "terrains": [
+              1,
+              1,
+              0,
+              0,
+              0,
+              1,
+              1,
+              1,
+              1
+            ]
+          },
+          "230": {
+            "terrains": [
+              1,
+              1,
+              0,
+              1,
+              0,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "221": {
+            "terrains": [
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1,
+              1
+            ]
+          },
+          "229": {
+            "terrains": [
+              0,
+              1,
+              1,
+              1,
+              0,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "177": {
+            "terrains": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ]
+          },
+          "184": {
+            "terrains": [
+              1,
+              1,
+              1,
+              1,
+              0,
+              1,
+              0,
+              1,
+              1
+            ]
+          },
+          "224": {
+            "terrains": [
+              0,
+              1,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "225": {
+            "terrains": [
+              1,
+              1,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1,
+              1
+            ]
+          },
+          "206": {
+            "terrains": [
+              0,
+              1,
+              0,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ]
+          },
+          "198": {
+            "terrains": [
+              0,
+              1,
+              1,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "132": {
+            "terrains": [
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null
             ]
           }
         },
@@ -6423,6 +6313,20 @@
       "name": "merchant_greeting",
       "start_node": "start",
       "nodes": {
+        "buy": {
+          "id": "buy",
+          "node_type": "text",
+          "speaker": "Merchant",
+          "text": "Excellent! I have swords, potions, and rare artifacts. Take a look!",
+          "choices": [],
+          "next_node": "bye",
+          "condition": null,
+          "action": null,
+          "position": [
+            298.0,
+            20.0
+          ]
+        },
         "start": {
           "id": "start",
           "node_type": "choice",
@@ -6453,32 +6357,18 @@
             102.0
           ]
         },
-        "sell": {
-          "id": "sell",
+        "bye": {
+          "id": "bye",
           "node_type": "text",
           "speaker": "Merchant",
-          "text": "I'm always looking for interesting items. Show me what you've got!",
+          "text": "Safe travels, friend! Come back anytime!",
           "choices": [],
-          "next_node": "bye",
+          "next_node": "end",
           "condition": null,
           "action": null,
           "position": [
-            294.0,
-            160.0
-          ]
-        },
-        "buy": {
-          "id": "buy",
-          "node_type": "text",
-          "speaker": "Merchant",
-          "text": "Excellent! I have swords, potions, and rare artifacts. Take a look!",
-          "choices": [],
-          "next_node": "bye",
-          "condition": null,
-          "action": null,
-          "position": [
-            298.0,
-            20.0
+            546.0,
+            146.0
           ]
         },
         "end": {
@@ -6495,18 +6385,18 @@
             147.0
           ]
         },
-        "bye": {
-          "id": "bye",
+        "sell": {
+          "id": "sell",
           "node_type": "text",
           "speaker": "Merchant",
-          "text": "Safe travels, friend! Come back anytime!",
+          "text": "I'm always looking for interesting items. Show me what you've got!",
           "choices": [],
-          "next_node": "end",
+          "next_node": "bye",
           "condition": null,
           "action": null,
           "position": [
-            546.0,
-            146.0
+            294.0,
+            160.0
           ]
         },
         "browse": {

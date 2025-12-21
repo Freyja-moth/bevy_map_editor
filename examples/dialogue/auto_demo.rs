@@ -9,6 +9,7 @@
 //!
 //! Run with: cargo run --example dialogue_auto_demo -p bevy_map_editor_examples
 
+use bevy::asset::AssetPlugin;
 use bevy::prelude::*;
 use bevy_map::dialogue::{DialogueNodeType, DialogueTree};
 use bevy_map::prelude::*;
@@ -16,14 +17,21 @@ use bevy_map::runtime::DialogueTreeHandle;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Dialogue Auto Demo - DialogueTreeHandle".to_string(),
-                resolution: (800, 600).into(),
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Dialogue Auto Demo - DialogueTreeHandle".to_string(),
+                        resolution: (800, 600).into(),
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(AssetPlugin {
+                    file_path: "assets".to_string(),
+                    ..default()
+                }),
+        )
         .add_plugins(MapRuntimePlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, (handle_input, update_display))
@@ -71,7 +79,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 fn handle_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut runner: ResMut<DialogueRunner>,
-    dialogue_query: Query<&DialogueHandle>,
+    dialogue_query: Query<&DialogueHandle, With<DialogueTreeHandle>>,
     dialogue_assets: Res<Assets<DialogueTree>>,
 ) {
     // Get the dialogue tree from the auto-loaded handle
@@ -129,7 +137,7 @@ fn handle_input(
 
 fn update_display(
     runner: Res<DialogueRunner>,
-    dialogue_query: Query<Option<&DialogueHandle>>,
+    dialogue_query: Query<Option<&DialogueHandle>, With<DialogueTreeHandle>>,
     dialogue_assets: Res<Assets<DialogueTree>>,
     mut display_query: Query<&mut Text, With<DialogueDisplay>>,
 ) {
@@ -137,7 +145,7 @@ fn update_display(
         return;
     };
 
-    // Check if dialogue is loaded
+    // Check if dialogue is loaded (entity has DialogueTreeHandle, may or may not have DialogueHandle yet)
     let tree = match dialogue_query.single() {
         Ok(Some(h)) => dialogue_assets.get(&h.0),
         _ => None,

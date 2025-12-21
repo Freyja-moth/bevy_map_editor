@@ -9,19 +9,27 @@
 //!
 //! Run with: cargo run --example runtime_loader -p bevy_map_editor_examples
 
+use bevy::asset::AssetPlugin;
 use bevy::prelude::*;
 use bevy_map::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "bevy_map - Runtime Loader".to_string(),
-                resolution: (800, 600).into(),
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "bevy_map - Runtime Loader".to_string(),
+                        resolution: (800, 600).into(),
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(AssetPlugin {
+                    file_path: "assets".to_string(),
+                    ..default()
+                }),
+        )
         .add_plugins(MapRuntimePlugin)
         // Register custom entity types that match our map's data types
         .register_map_entity::<Npc>()

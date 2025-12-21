@@ -12,20 +12,28 @@
 //!
 //! Run with: cargo run --example tileset_demo -p bevy_map_editor_examples
 
+use bevy::asset::AssetPlugin;
 use bevy::prelude::*;
 use bevy_map::core::{CollisionShape, LayerData, OneWayDirection};
 use bevy_map::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Tileset Demo - bevy_map_editor".to_string(),
-                resolution: (800, 600).into(),
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Tileset Demo - bevy_map_editor".to_string(),
+                        resolution: (800, 600).into(),
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(AssetPlugin {
+                    file_path: "assets".to_string(),
+                    ..default()
+                }),
+        )
         .add_plugins(MapRuntimePlugin)
         .init_resource::<CursorState>()
         .add_systems(Startup, setup)

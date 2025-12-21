@@ -16,6 +16,7 @@
 //! Run with: cargo run --example collision_demo -p bevy_map_editor_examples
 
 use avian2d::prelude::*;
+use bevy::asset::AssetPlugin;
 use bevy::prelude::*;
 use bevy_map::core::CollisionShape;
 use bevy_map::prelude::*;
@@ -23,14 +24,21 @@ use bevy_map::runtime::{MapCollider, MapCollisionPlugin};
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Collision Demo - bevy_map_editor".to_string(),
-                resolution: (800, 600).into(),
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Collision Demo - bevy_map_editor".to_string(),
+                        resolution: (800, 600).into(),
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(AssetPlugin {
+                    file_path: "assets".to_string(),
+                    ..default()
+                }),
+        )
         .add_plugins(MapRuntimePlugin)
         .add_plugins(MapCollisionPlugin) // Auto-spawns Avian2D colliders!
         .add_plugins(PhysicsPlugins::default())

@@ -14,6 +14,7 @@
 //!
 //! Run with: cargo run --example dialogue_manual_demo -p bevy_map_editor_examples
 
+use bevy::asset::AssetPlugin;
 use bevy::prelude::*;
 use bevy_map::dialogue::{DialogueNodeType, DialogueTree};
 use bevy_map::prelude::*;
@@ -21,14 +22,21 @@ use bevy_map::runtime::MapProjectLoader;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Dialogue Manual Demo - Full Control".to_string(),
-                resolution: (800, 600).into(),
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Dialogue Manual Demo - Full Control".to_string(),
+                        resolution: (800, 600).into(),
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(AssetPlugin {
+                    file_path: "assets".to_string(),
+                    ..default()
+                }),
+        )
         .add_plugins(DialoguePlugin)
         // Register MapProject asset manually (not using MapRuntimePlugin)
         .init_asset::<MapProject>()

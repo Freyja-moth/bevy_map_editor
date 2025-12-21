@@ -133,19 +133,19 @@ fn sync_level_rendering(
 
     // Check if we need to switch levels
     if render_state.rendered_level != current_level_id {
-        // Despawn all tile entities from storages first
+        // Despawn all tile entities from storages first (safe - entity may not exist)
         for storage in render_state.tile_storages.values() {
             for tile_entity in storage.iter().flatten() {
-                commands.entity(*tile_entity).despawn();
+                let _ = commands.get_entity(*tile_entity).map(|mut e| e.despawn());
             }
         }
-        // Despawn all tilemap entities
+        // Despawn all tilemap entities (safe - entity may not exist)
         for entity in tilemap_query.iter() {
-            commands.entity(entity).despawn();
+            let _ = commands.get_entity(entity).map(|mut e| e.despawn());
         }
-        // Despawn multi-cell tile sprites
+        // Despawn multi-cell tile sprites (safe - entity may not exist)
         for entity in render_state.multi_cell_sprites.values() {
-            commands.entity(*entity).despawn();
+            let _ = commands.get_entity(*entity).map(|mut e| e.despawn());
         }
         render_state.tilemap_entities.clear();
         render_state.tile_storages.clear();
@@ -166,19 +166,19 @@ fn sync_level_rendering(
 
     // Rebuild if needed
     if render_state.needs_rebuild {
-        // Despawn all tile entities from storages first
+        // Despawn all tile entities from storages first (safe - entity may not exist)
         for storage in render_state.tile_storages.values() {
             for tile_entity in storage.iter().flatten() {
-                commands.entity(*tile_entity).despawn();
+                let _ = commands.get_entity(*tile_entity).map(|mut e| e.despawn());
             }
         }
-        // Despawn all tilemap entities
+        // Despawn all tilemap entities (safe - entity may not exist)
         for entity in tilemap_query.iter() {
-            commands.entity(entity).despawn();
+            let _ = commands.get_entity(entity).map(|mut e| e.despawn());
         }
-        // Despawn multi-cell tile sprites
+        // Despawn multi-cell tile sprites (safe - entity may not exist)
         for entity in render_state.multi_cell_sprites.values() {
-            commands.entity(*entity).despawn();
+            let _ = commands.get_entity(*entity).map(|mut e| e.despawn());
         }
         render_state.tilemap_entities.clear();
         render_state.tile_storages.clear();
@@ -522,7 +522,7 @@ pub fn update_tile(
     if effective_tile_index.is_some() {
         let multi_cell_key = (level_id, layer_index, x, y);
         if let Some(entity) = render_state.multi_cell_sprites.remove(&multi_cell_key) {
-            commands.entity(entity).despawn();
+            let _ = commands.get_entity(entity).map(|mut e| e.despawn());
         }
     }
 
@@ -540,7 +540,7 @@ pub fn update_tile(
                 for ((lid, li, _), storage) in render_state.tile_storages.iter_mut() {
                     if *lid == level_id && *li == layer_index {
                         if let Some(entity) = storage.get(&tile_pos) {
-                            commands.entity(entity).despawn();
+                            let _ = commands.get_entity(entity).map(|mut e| e.despawn());
                             storage.remove(&tile_pos);
                         }
                     }
@@ -614,7 +614,7 @@ pub fn update_tile(
                 for ((lid, li, img_idx), storage) in render_state.tile_storages.iter_mut() {
                     if *lid == level_id && *li == layer_index && *img_idx != image_index {
                         if let Some(old_entity) = storage.get(&tile_pos) {
-                            commands.entity(old_entity).despawn();
+                            let _ = commands.get_entity(old_entity).map(|mut e| e.despawn());
                             storage.remove(&tile_pos);
                         }
                     }
@@ -683,7 +683,7 @@ pub fn update_tile(
 
                     // Remove old tile if exists
                     if let Some(old_entity) = storage.get(&tile_pos) {
-                        commands.entity(old_entity).despawn();
+                        let _ = commands.get_entity(old_entity).map(|mut e| e.despawn());
                     }
 
                     // Spawn new tile
@@ -704,7 +704,7 @@ pub fn update_tile(
         for ((lid, li, _), storage) in render_state.tile_storages.iter_mut() {
             if *lid == level_id && *li == layer_index {
                 if let Some(entity) = storage.get(&tile_pos) {
-                    commands.entity(entity).despawn();
+                    let _ = commands.get_entity(entity).map(|mut e| e.despawn());
                     storage.remove(&tile_pos);
                 }
             }
@@ -758,7 +758,7 @@ fn sync_grid_rendering(
 
     // Despawn existing grid
     for entity in render_state.grid_entities.drain(..) {
-        commands.entity(entity).despawn();
+        let _ = commands.get_entity(entity).map(|mut e| e.despawn());
     }
 
     render_state.last_grid_visible = show_grid;
@@ -834,7 +834,7 @@ fn sync_collision_rendering(
 
     // Despawn existing collision overlays
     for entity in cache.entities.drain(..) {
-        commands.entity(entity).despawn();
+        let _ = commands.get_entity(entity).map(|mut e| e.despawn());
     }
 
     cache.last_visible = show_collisions;
@@ -1050,7 +1050,7 @@ fn sync_selection_preview(
 ) {
     // Always despawn existing preview first
     for entity in existing_preview.iter() {
-        commands.entity(entity).despawn();
+        let _ = commands.get_entity(entity).map(|mut e| e.despawn());
     }
 
     // If ViewportInputState doesn't exist, skip
@@ -1203,7 +1203,7 @@ fn sync_tile_selection_highlights(
     let clear_highlights = |commands: &mut Commands, state: &mut SelectionRenderState| {
         if let Some(entities) = state.border_entities.take() {
             for entity in entities {
-                commands.entity(entity).despawn();
+                let _ = commands.get_entity(entity).map(|mut e| e.despawn());
             }
         }
         state.highlighted_tiles.clear();
@@ -1434,7 +1434,7 @@ fn sync_terrain_preview(
     for pos in to_remove {
         if let Some(entities) = preview_cache.tile_entities.remove(&pos) {
             for entity in entities {
-                commands.entity(entity).despawn();
+                let _ = commands.get_entity(entity).map(|mut e| e.despawn());
             }
         }
         preview_cache.current_tiles.remove(&pos);
@@ -1450,7 +1450,7 @@ fn sync_terrain_preview(
         // No tileset, clear everything remaining
         for (_, entities) in preview_cache.tile_entities.drain() {
             for entity in entities {
-                commands.entity(entity).despawn();
+                let _ = commands.get_entity(entity).map(|mut e| e.despawn());
             }
         }
         preview_cache.current_tiles.clear();
@@ -1469,7 +1469,7 @@ fn sync_terrain_preview(
         // Remove old entities if updating
         if let Some(entities) = preview_cache.tile_entities.remove(&(x, y)) {
             for entity in entities {
-                commands.entity(entity).despawn();
+                let _ = commands.get_entity(entity).map(|mut e| e.despawn());
             }
         }
 
@@ -1623,10 +1623,10 @@ fn sync_brush_preview(
     // Helper to clear preview
     fn clear_preview(commands: &mut Commands, cache: &mut BrushPreviewCache) {
         if let Some(entity) = cache.sprite_entity.take() {
-            commands.entity(entity).despawn();
+            let _ = commands.get_entity(entity).map(|mut e| e.despawn());
         }
         for entity in cache.border_entities.drain(..) {
-            commands.entity(entity).despawn();
+            let _ = commands.get_entity(entity).map(|mut e| e.despawn());
         }
         cache.last_position = None;
         cache.last_tile = None;
@@ -1894,10 +1894,10 @@ fn sync_entity_rendering(
         || entity_render_state.last_layer != current_layer_idx
     {
         for (_, sprite_entity) in entity_render_state.entity_sprites.drain() {
-            commands.entity(sprite_entity).despawn();
+            let _ = commands.get_entity(sprite_entity).map(|mut e| e.despawn());
         }
         if let Some(highlight_entity) = entity_render_state.selection_highlight.take() {
-            commands.entity(highlight_entity).despawn();
+            let _ = commands.get_entity(highlight_entity).map(|mut e| e.despawn());
         }
         entity_render_state.last_level = current_level_id;
         entity_render_state.last_layer = current_layer_idx;
@@ -1938,7 +1938,7 @@ fn sync_entity_rendering(
 
     for key in to_remove {
         if let Some(sprite_entity) = entity_render_state.entity_sprites.remove(&key) {
-            commands.entity(sprite_entity).despawn();
+            let _ = commands.get_entity(sprite_entity).map(|mut e| e.despawn());
         }
     }
 
@@ -1995,7 +1995,7 @@ fn sync_entity_rendering(
 
     // Handle selection highlight
     if let Some(highlight_entity) = entity_render_state.selection_highlight.take() {
-        commands.entity(highlight_entity).despawn();
+        let _ = commands.get_entity(highlight_entity).map(|mut e| e.despawn());
     }
 
     // Draw selection highlight around selected entity

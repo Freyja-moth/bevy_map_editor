@@ -13,19 +13,27 @@
 //!
 //! Run with: cargo run --example custom_entities_demo -p bevy_map_editor_examples
 
+use bevy::asset::AssetPlugin;
 use bevy::prelude::*;
 use bevy_map::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Custom Entities Demo - bevy_map_editor".to_string(),
-                resolution: (800, 600).into(),
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Custom Entities Demo - bevy_map_editor".to_string(),
+                        resolution: (800, 600).into(),
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(AssetPlugin {
+                    file_path: "assets".to_string(),
+                    ..default()
+                }),
+        )
         .add_plugins(MapRuntimePlugin)
         // Register your entity types - maps JSON type_name to Rust component
         .register_map_entity::<Npc>()

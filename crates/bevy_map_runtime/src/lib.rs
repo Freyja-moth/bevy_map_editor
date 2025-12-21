@@ -70,7 +70,55 @@ use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 use bevy_map_core::MapProject;
 use std::collections::HashMap;
+use std::path::Path;
 use uuid::Uuid;
+
+/// Convert an absolute file path to a relative asset path.
+///
+/// This handles paths saved by the editor which may be absolute (e.g.,
+/// "C:/Users/.../assets/tiles/tileset.png") and converts them to relative
+/// paths that Bevy's AssetServer can load (e.g., "tiles/tileset.png").
+///
+/// The function looks for an "assets" directory in the path and returns
+/// everything after it. If no "assets" directory is found, returns the
+/// original path.
+fn normalize_asset_path(path: &str) -> String {
+    // Normalize path separators to forward slashes
+    let normalized = path.replace('\\', "/");
+
+    // Look for "/assets/" marker in the path (case-insensitive)
+    let lower = normalized.to_lowercase();
+    if let Some(idx) = lower.find("/assets/") {
+        // Return everything after "/assets/"
+        return normalized[idx + 8..].to_string();
+    }
+
+    // If path starts with "assets/", strip it
+    if lower.starts_with("assets/") {
+        return normalized[7..].to_string();
+    }
+
+    // Check if it's already a relative path (no drive letter or leading slash)
+    let path_obj = Path::new(&normalized);
+    if !path_obj.has_root() && !normalized.contains(':') {
+        return normalized;
+    }
+
+    // If we couldn't find an assets directory, try to extract just the filename
+    // as a fallback (this helps in edge cases)
+    if let Some(file_name) = Path::new(&normalized).file_name() {
+        if let Some(name) = file_name.to_str() {
+            warn!(
+                "Could not find 'assets' directory in path '{}', using filename '{}'",
+                path, name
+            );
+            return name.to_string();
+        }
+    }
+
+    // Last resort: return original path and let Bevy handle the error
+    normalized
+}
 
 // Re-export core types
 pub use bevy_map_animation;
@@ -239,8 +287,14 @@ fn handle_map_handle_spawning(
 
         // Start loading textures if we haven't
         if !state.loading_textures {
+            info!("MapProject '{}' loaded, queueing texture loads...", project.level.name);
             let mut textures = TilesetTextures::new();
             textures.load_from_project(project, &asset_server);
+            info!(
+                "Queued {} tileset images, {} sprite sheets for loading",
+                textures.images.len(),
+                textures.sprite_sheet_images.len()
+            );
             state.textures = Some(textures);
             state.loading_textures = true;
         }
@@ -251,6 +305,17 @@ fn handle_map_handle_spawning(
         };
 
         if !textures.all_loaded(&asset_server) {
+            // Log loading state periodically (only once per second to avoid spam)
+            static LAST_LOG: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            let last = LAST_LOG.load(std::sync::atomic::Ordering::Relaxed);
+            if now > last {
+                LAST_LOG.store(now, std::sync::atomic::Ordering::Relaxed);
+                textures.log_loading_state(&asset_server);
+            }
             continue;
         }
 
@@ -258,6 +323,13 @@ fn handle_map_handle_spawning(
         if state.spawned {
             continue;
         }
+
+        info!(
+            "Spawning map '{}' with {} layers, {} tilesets",
+            project.level.name,
+            project.level.layers.len(),
+            project.tilesets.len()
+        );
 
         // Load dialogues from the project
         map_dialogues.load_from_project(project);
@@ -369,14 +441,17 @@ impl TilesetTextures {
     ) {
         // Load tileset images
         for (tileset_id, image_index, path) in project.image_paths() {
-            // Clone the path to owned String for asset loading
-            let handle = asset_server.load(path.to_string());
+            // Convert absolute paths to relative asset paths
+            let asset_path = normalize_asset_path(path);
+            let handle = asset_server.load(asset_path);
             self.images.insert((tileset_id, image_index), handle);
         }
 
         // Load sprite sheet images
         for (sprite_sheet_id, path) in project.sprite_sheet_paths() {
-            let handle = asset_server.load(path.to_string());
+            // Convert absolute paths to relative asset paths
+            let asset_path = normalize_asset_path(path);
+            let handle = asset_server.load(asset_path);
             self.sprite_sheet_images.insert(sprite_sheet_id, handle);
         }
 
@@ -409,19 +484,71 @@ impl TilesetTextures {
     /// Check if all textures (tilesets and sprite sheets) are loaded
     pub fn all_loaded(&self, asset_server: &AssetServer) -> bool {
         use bevy::asset::LoadState;
+
         let tilesets_loaded = self.images.values().all(|handle| {
-            matches!(
-                asset_server.get_load_state(handle.id()),
-                Some(LoadState::Loaded)
-            )
+            match asset_server.get_load_state(handle.id()) {
+                Some(LoadState::Loaded) => true,
+                Some(LoadState::Failed(_)) => {
+                    // Treat failed as "loaded" so we don't block forever
+                    // The error will be logged elsewhere
+                    true
+                }
+                _ => false,
+            }
         });
+
         let sprite_sheets_loaded = self.sprite_sheet_images.values().all(|handle| {
-            matches!(
-                asset_server.get_load_state(handle.id()),
-                Some(LoadState::Loaded)
-            )
+            match asset_server.get_load_state(handle.id()) {
+                Some(LoadState::Loaded) => true,
+                Some(LoadState::Failed(_)) => true,
+                _ => false,
+            }
         });
+
         tilesets_loaded && sprite_sheets_loaded
+    }
+
+    /// Log the current loading state of all textures (for debugging)
+    pub fn log_loading_state(&self, asset_server: &AssetServer) {
+        use bevy::asset::LoadState;
+
+        for ((tileset_id, image_index), handle) in &self.images {
+            let state = asset_server.get_load_state(handle.id());
+            match state {
+                Some(LoadState::Loaded) => {}
+                Some(LoadState::Failed(ref err)) => {
+                    warn!(
+                        "Tileset {:?} image {}: FAILED - {}",
+                        tileset_id, image_index, err
+                    );
+                }
+                Some(LoadState::Loading) => {
+                    info!(
+                        "Tileset {:?} image {}: still loading...",
+                        tileset_id, image_index
+                    );
+                }
+                state => {
+                    info!(
+                        "Tileset {:?} image {}: state {:?}",
+                        tileset_id, image_index, state
+                    );
+                }
+            }
+        }
+
+        for (sprite_sheet_id, handle) in &self.sprite_sheet_images {
+            let state = asset_server.get_load_state(handle.id());
+            match state {
+                Some(LoadState::Loaded) => {}
+                Some(LoadState::Failed(ref err)) => {
+                    warn!("Sprite sheet {:?}: FAILED - {}", sprite_sheet_id, err);
+                }
+                _ => {
+                    info!("Sprite sheet {:?}: state {:?}", sprite_sheet_id, state);
+                }
+            }
+        }
     }
 }
 
@@ -609,7 +736,9 @@ fn handle_animated_sprite_loading(
 
         // Start loading texture if needed
         if !state.texture_loading {
-            let texture: Handle<Image> = asset_server.load(&sprite_data.sheet_path);
+            // Convert absolute paths to relative asset paths
+            let asset_path = normalize_asset_path(&sprite_data.sheet_path);
+            let texture: Handle<Image> = asset_server.load(asset_path);
             state.texture_handle = Some(texture);
             state.sprite_data_handle = Some(sprite_data_assets.add(sprite_data.clone()));
             state.frame_size = Some((sprite_data.frame_width, sprite_data.frame_height));
@@ -1036,11 +1165,16 @@ pub fn spawn_map_project(
 
     // Spawn each tile layer
     for (layer_index, layer) in level.layers.iter().enumerate() {
+        info!("Processing layer {}: '{}'", layer_index, layer.name);
+
         if let bevy_map_core::LayerData::Tiles {
             tileset_id, tiles, ..
         } = &layer.data
         {
+            info!("  Layer {} is a tile layer with {} tiles, tileset {}", layer_index, tiles.len(), tileset_id);
+
             if tiles.is_empty() {
+                info!("  Layer {} has empty tiles array, skipping", layer_index);
                 continue;
             }
 
@@ -1052,6 +1186,8 @@ pub fn spawn_map_project(
                 );
                 continue;
             };
+
+            info!("  Found tileset '{}' with {} images", tileset.name, tileset.images.len());
 
             // For multi-image tilesets, we need to create separate tilemaps per image
             // because bevy_ecs_tilemap uses a single texture per tilemap.
@@ -1077,6 +1213,13 @@ pub fn spawn_map_project(
 
             // Spawn a tilemap for each image used in this layer
             for (image_index, image_tiles) in tiles_by_image {
+                info!(
+                    "Layer {}: Spawning {} tiles from tileset {} image {}",
+                    layer_index,
+                    image_tiles.len(),
+                    tileset_id,
+                    image_index
+                );
                 let Some(texture_handle) = textures.get(*tileset_id, image_index) else {
                     warn!(
                         "Missing texture for tileset {} image {}",
@@ -1133,6 +1276,8 @@ pub fn spawn_map_project(
 
                 commands.entity(map_entity).add_child(tilemap_entity);
             }
+        } else {
+            info!("  Layer {} is not a tile layer (entity layer or other)", layer_index);
         }
     }
 

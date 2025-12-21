@@ -110,9 +110,29 @@ struct TypedSpawner<T: MapEntityType> {
 impl<T: MapEntityType> EntitySpawner for TypedSpawner<T> {
     fn spawn(&self, commands: &mut Commands, instance: &EntityInstance, transform: Transform) {
         let component = T::from_instance(instance);
+
+        // Parse entity color from instance if available, otherwise use a default
+        let color = instance
+            .get_string("_editor_color")
+            .and_then(|c| parse_hex_color(c))
+            .unwrap_or(Color::srgba(0.2, 0.6, 1.0, 0.8)); // Default blue
+
+        // Get marker size from instance or use default
+        let marker_size = instance
+            .get_float("_editor_marker_size")
+            .unwrap_or(16.0) as f32;
+
         commands.spawn((
             component,
             transform,
+            // Required for visibility
+            Visibility::default(),
+            // Placeholder visual - colored rectangle
+            Sprite {
+                color,
+                custom_size: Some(Vec2::splat(marker_size)),
+                ..default()
+            },
             MapEntityMarker {
                 instance_id: instance.id,
                 type_name: instance.type_name.clone(),
@@ -121,6 +141,30 @@ impl<T: MapEntityType> EntitySpawner for TypedSpawner<T> {
                 properties: instance.properties.clone(),
             },
         ));
+    }
+}
+
+/// Parse a hex color string like "#ff0000" or "#ff000080" (with alpha)
+fn parse_hex_color(hex: &str) -> Option<Color> {
+    let hex = hex.trim_start_matches('#');
+    if hex.len() == 6 {
+        let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+        Some(Color::srgba(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 0.8))
+    } else if hex.len() == 8 {
+        let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+        let a = u8::from_str_radix(&hex[6..8], 16).ok()?;
+        Some(Color::srgba(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            a as f32 / 255.0,
+        ))
+    } else {
+        None
     }
 }
 
@@ -163,27 +207,49 @@ impl EntityRegistry {
 
     /// Spawn an entity from an EntityInstance
     ///
-    /// Returns true if the entity was spawned, false if the type was not registered
+    /// Returns true if the entity type was registered, false otherwise.
+    /// Note: Unregistered entities are still spawned with a placeholder visual
+    /// so they're visible in the game for debugging purposes.
     pub fn spawn(
         &self,
         commands: &mut Commands,
         instance: &EntityInstance,
         base_transform: Transform,
     ) -> bool {
+        // Create transform from instance position + base transform
+        let entity_transform =
+            base_transform * Transform::from_xyz(instance.position[0], instance.position[1], 0.0);
+
         if let Some(spawner) = self.spawners.get(&instance.type_name) {
-            // Create transform from instance position + base transform
-            let entity_transform = base_transform
-                * Transform::from_xyz(instance.position[0], instance.position[1], 0.0);
             spawner.spawn(commands, instance, entity_transform);
             true
         } else {
+            // Spawn unregistered entities with a placeholder visual (red = unregistered)
+            commands.spawn((
+                entity_transform,
+                Visibility::default(),
+                Sprite {
+                    color: Color::srgba(1.0, 0.2, 0.2, 0.8), // Red for unregistered
+                    custom_size: Some(Vec2::splat(16.0)),
+                    ..default()
+                },
+                MapEntityMarker {
+                    instance_id: instance.id,
+                    type_name: instance.type_name.clone(),
+                },
+                EntityProperties {
+                    properties: instance.properties.clone(),
+                },
+            ));
             false
         }
     }
 
     /// Spawn all entities from a list of instances
     ///
-    /// Returns the number of entities that could not be spawned due to unregistered types
+    /// Returns the number of unregistered entity types encountered.
+    /// Note: All entities are spawned, but unregistered ones get a red placeholder
+    /// instead of their game-specific component.
     pub fn spawn_all(
         &self,
         commands: &mut Commands,
@@ -194,7 +260,7 @@ impl EntityRegistry {
         for instance in instances {
             if !self.spawn(commands, instance, base_transform) {
                 warn!(
-                    "Unknown entity type '{}' - entity not spawned",
+                    "Entity type '{}' not registered - spawned with red placeholder (use .register_map_entity::<YourType>() to register)",
                     instance.type_name
                 );
                 unregistered += 1;
