@@ -13,7 +13,7 @@ use bevy_map_autotile::terrain::Color as TerrainColor;
 use bevy_map_autotile::TerrainSetType;
 use std::f32::consts::PI;
 
-use super::TilesetTextureCache;
+use super::{find_base_tile_for_position, EditorTheme, TilesetTextureCache};
 use crate::project::Project;
 use crate::EditorState;
 
@@ -506,7 +506,10 @@ pub enum CollisionDragOperation {
     /// Moving the entire shape
     MoveShape { original_offset: [f32; 2] },
     /// Resizing a rectangle via a corner handle
-    ResizeRect { corner: RectCorner, original: ([f32; 2], [f32; 2]) },
+    ResizeRect {
+        corner: RectCorner,
+        original: ([f32; 2], [f32; 2]),
+    },
     /// Resizing a circle via the edge handle
     ResizeCircle { original_radius: f32 },
     /// Moving a polygon vertex
@@ -907,8 +910,8 @@ fn render_tileset_with_terrain_overlay(
     ui: &mut egui::Ui,
     editor_state: &mut EditorState,
     project: &mut Project,
-    _tileset_id: uuid::Uuid,
-    _tile_size: u32,
+    tileset_id: uuid::Uuid,
+    tile_size: u32,
     images: &[bevy_map_core::TilesetImage],
     cache: Option<&TilesetTextureCache>,
 ) {
@@ -1022,7 +1025,6 @@ fn render_tileset_with_terrain_overlay(
                                 &terrain_colors,
                             );
                         }
-
                     }
 
                     // Draw thin border to show tile boundaries
@@ -1032,6 +1034,29 @@ fn render_tileset_with_terrain_overlay(
                         egui::Stroke::new(1.0, Color32::from_gray(80)),
                         egui::StrokeKind::Inside,
                     );
+
+                    // Draw origin indicator if tile has custom origin
+                    if let Some(tileset) = project.tilesets.iter().find(|t| t.id == tileset_id) {
+                        if let Some(props) = tileset.get_tile_properties(virtual_index) {
+                            if props.origin_x.is_some() || props.origin_y.is_some() {
+                                let tile_pixel_size = tile_size as f32;
+                                let (ox, oy) = props.get_origin(tile_size, tile_size);
+
+                                // Scale origin to display size
+                                let scale = tile_display_size / tile_pixel_size;
+                                let origin_screen_x = rect.left() + ox as f32 * scale;
+                                let origin_screen_y = rect.top() + oy as f32 * scale;
+
+                                // Draw small red dot
+                                let dot_radius = 2.0 * (tile_display_size / 32.0).max(1.0);
+                                ui.painter().circle_filled(
+                                    egui::pos2(origin_screen_x, origin_screen_y),
+                                    dot_radius,
+                                    Color32::from_rgb(255, 100, 100),
+                                );
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1381,6 +1406,143 @@ fn render_tile_properties_tab(
 
                     ui.separator();
 
+                    // Origin point editor (for multi-cell tiles)
+                    ui.heading("Origin Point");
+                    ui.small("Click and drag to set where the tile anchors when placed");
+
+                    // Get tileset info for rendering
+                    if let Some(tileset) = project.tilesets.iter().find(|t| t.id == tileset_id) {
+                        let tile_size = tileset.tile_size;
+
+                        // Calculate tile dimensions in pixels
+                        let tile_pixel_width = current_props.grid_width * tile_size;
+                        let tile_pixel_height = current_props.grid_height * tile_size;
+
+                        // Current origin (default to center)
+                        let origin_x = current_props.origin_x.unwrap_or(tile_pixel_width / 2);
+                        let origin_y = current_props.origin_y.unwrap_or(tile_pixel_height / 2);
+
+                        // Display scale (fit in reasonable size, max 200px)
+                        let max_display = 200.0;
+                        let scale = (max_display / tile_pixel_width.max(tile_pixel_height) as f32)
+                            .clamp(0.5, 2.0);
+                        let display_width = tile_pixel_width as f32 * scale;
+                        let display_height = tile_pixel_height as f32 * scale;
+
+                        // Allocate interactive area for tile preview
+                        let (rect, response) = ui.allocate_exact_size(
+                            egui::vec2(display_width, display_height),
+                            egui::Sense::click_and_drag(),
+                        );
+
+                        // Try to draw tile texture preview
+                        if let Some((image_index, local_idx)) = tileset.virtual_to_local(tile_idx) {
+                            if let Some(image) = tileset.images.get(image_index) {
+                                if let Some(tex_id) = cache
+                                    .and_then(|c| c.loaded.get(&image.id))
+                                    .map(|(_, tex_id, _, _)| *tex_id)
+                                {
+                                    // Calculate UV coordinates for this tile
+                                    let tile_col = local_idx % image.columns;
+                                    let tile_row = local_idx / image.columns;
+                                    let uv_tile_width = 1.0 / image.columns as f32;
+                                    let uv_tile_height = 1.0 / image.rows as f32;
+
+                                    let uv_min = egui::pos2(
+                                        tile_col as f32 * uv_tile_width,
+                                        tile_row as f32 * uv_tile_height,
+                                    );
+                                    let uv_max = egui::pos2(
+                                        (tile_col + current_props.grid_width) as f32
+                                            * uv_tile_width,
+                                        (tile_row + current_props.grid_height) as f32
+                                            * uv_tile_height,
+                                    );
+
+                                    // Draw tile texture
+                                    let mut mesh = egui::Mesh::with_texture(tex_id);
+                                    mesh.add_rect_with_uv(
+                                        rect,
+                                        egui::Rect::from_min_max(uv_min, uv_max),
+                                        Color32::WHITE,
+                                    );
+                                    ui.painter().add(egui::Shape::mesh(mesh));
+                                }
+                            }
+                        }
+
+                        // Draw border around preview
+                        ui.painter().rect_stroke(
+                            rect,
+                            0.0,
+                            egui::Stroke::new(1.0, Color32::from_gray(100)),
+                            egui::StrokeKind::Inside,
+                        );
+
+                        // Draw origin point marker (crosshair)
+                        let origin_screen_x = rect.left() + origin_x as f32 * scale;
+                        let origin_screen_y = rect.top() + origin_y as f32 * scale;
+                        let origin_pos = egui::pos2(origin_screen_x, origin_screen_y);
+
+                        // Crosshair lines
+                        let crosshair_size = 10.0;
+                        ui.painter().line_segment(
+                            [
+                                origin_pos - egui::vec2(crosshair_size, 0.0),
+                                origin_pos + egui::vec2(crosshair_size, 0.0),
+                            ],
+                            egui::Stroke::new(2.0, Color32::RED),
+                        );
+                        ui.painter().line_segment(
+                            [
+                                origin_pos - egui::vec2(0.0, crosshair_size),
+                                origin_pos + egui::vec2(0.0, crosshair_size),
+                            ],
+                            egui::Stroke::new(2.0, Color32::RED),
+                        );
+                        // Center dot
+                        ui.painter().circle_filled(origin_pos, 4.0, Color32::RED);
+
+                        // Handle drag to move origin
+                        if response.dragged() || response.clicked() {
+                            if let Some(pointer_pos) = response.interact_pointer_pos() {
+                                // Convert screen position to tile pixel coordinates
+                                let new_x = ((pointer_pos.x - rect.left()) / scale)
+                                    .clamp(0.0, tile_pixel_width as f32 - 1.0)
+                                    as u32;
+                                let new_y = ((pointer_pos.y - rect.top()) / scale)
+                                    .clamp(0.0, tile_pixel_height as f32 - 1.0)
+                                    as u32;
+
+                                if let Some(tileset) =
+                                    project.tilesets.iter_mut().find(|t| t.id == tileset_id)
+                                {
+                                    let props = tileset.get_tile_properties_mut(tile_idx);
+                                    props.origin_x = Some(new_x);
+                                    props.origin_y = Some(new_y);
+                                    project.mark_dirty();
+                                }
+                            }
+                        }
+
+                        // Show coordinates and reset button
+                        ui.horizontal(|ui| {
+                            ui.label(format!("Origin: ({}, {})", origin_x, origin_y));
+                            if ui.button("Reset to Center").clicked() {
+                                if let Some(tileset) =
+                                    project.tilesets.iter_mut().find(|t| t.id == tileset_id)
+                                {
+                                    let props = tileset.get_tile_properties_mut(tile_idx);
+                                    props.origin_x = None;
+                                    props.origin_y = None;
+                                    project.mark_dirty();
+                                }
+                            }
+                        });
+                    }
+
+                    ui.separator();
+
                     // Animation settings
                     ui.heading("Animation");
 
@@ -1526,7 +1688,7 @@ fn render_tile_selector_for_properties(
                                     display_size,
                                 ))
                                 .uv(egui::Rect::from_min_max(uv_min, uv_max))
-                                .selected(selected)
+                                .frame(false) // Remove button padding
                                 .rounding(0.0),
                             )
                         } else {
@@ -1537,14 +1699,38 @@ fn render_tile_selector_for_properties(
                             )
                         };
 
+                        // Draw selection border manually (doesn't obscure content)
+                        if selected {
+                            ui.painter().rect_stroke(
+                                response.rect,
+                                0.0,
+                                egui::Stroke::new(2.0, EditorTheme::ACCENT_BLUE),
+                                egui::StrokeKind::Inside,
+                            );
+                        }
+
                         // Track rect for shift+drag interaction
                         tile_rects.push((col, row, response.rect, virtual_index));
 
                         // Normal click selection (only if not shift-dragging)
                         if response.clicked() && !shift_held {
+                            // Find base tile if this is part of a merged tile
+                            let tile_to_select = if let Some(tileset) =
+                                project.tilesets.iter().find(|t| t.id == tileset_id)
+                            {
+                                find_base_tile_for_position(
+                                    tileset,
+                                    virtual_offset,
+                                    image.columns,
+                                    image.rows,
+                                    virtual_index,
+                                )
+                            } else {
+                                virtual_index
+                            };
                             editor_state
                                 .tileset_editor_state
-                                .selected_tile_for_properties = Some(virtual_index);
+                                .selected_tile_for_properties = Some(tile_to_select);
                         }
 
                         response.on_hover_text(format!("Tile {}", virtual_index));
@@ -1645,11 +1831,7 @@ fn render_tile_selector_for_properties(
                                 // Find combined rect
                                 let mut combined_rect: Option<egui::Rect> = None;
                                 for &(tc, tr, rect, _) in &tile_rects {
-                                    if tc >= col
-                                        && tc <= end_col
-                                        && tr >= row
-                                        && tr <= end_row
-                                    {
+                                    if tc >= col && tc <= end_col && tr >= row && tr <= end_row {
                                         combined_rect = Some(match combined_rect {
                                             None => rect,
                                             Some(r) => r.union(rect),
@@ -1805,14 +1987,20 @@ fn render_collision_tab(
 
             ui.horizontal(|ui| {
                 if ui
-                    .selectable_label(collision_state.drawing_mode == CollisionDrawMode::Select, "Select")
+                    .selectable_label(
+                        collision_state.drawing_mode == CollisionDrawMode::Select,
+                        "Select",
+                    )
                     .clicked()
                 {
                     collision_state.drawing_mode = CollisionDrawMode::Select;
                     collision_state.polygon_points.clear();
                 }
                 if ui
-                    .selectable_label(collision_state.drawing_mode == CollisionDrawMode::Rectangle, "Rect")
+                    .selectable_label(
+                        collision_state.drawing_mode == CollisionDrawMode::Rectangle,
+                        "Rect",
+                    )
                     .clicked()
                 {
                     collision_state.drawing_mode = CollisionDrawMode::Rectangle;
@@ -1821,14 +2009,20 @@ fn render_collision_tab(
             });
             ui.horizontal(|ui| {
                 if ui
-                    .selectable_label(collision_state.drawing_mode == CollisionDrawMode::Circle, "Circle")
+                    .selectable_label(
+                        collision_state.drawing_mode == CollisionDrawMode::Circle,
+                        "Circle",
+                    )
                     .clicked()
                 {
                     collision_state.drawing_mode = CollisionDrawMode::Circle;
                     collision_state.polygon_points.clear();
                 }
                 if ui
-                    .selectable_label(collision_state.drawing_mode == CollisionDrawMode::Polygon, "Polygon")
+                    .selectable_label(
+                        collision_state.drawing_mode == CollisionDrawMode::Polygon,
+                        "Polygon",
+                    )
                     .clicked()
                 {
                     collision_state.drawing_mode = CollisionDrawMode::Polygon;
@@ -1872,7 +2066,10 @@ fn render_collision_tab(
             ui.label("Preview Zoom:");
             ui.add(
                 egui::Slider::new(
-                    &mut editor_state.tileset_editor_state.collision_editor.preview_zoom,
+                    &mut editor_state
+                        .tileset_editor_state
+                        .collision_editor
+                        .preview_zoom,
                     4.0..=16.0,
                 )
                 .show_value(false),
@@ -1934,11 +2131,13 @@ fn render_collision_tile_selector(
                             .and_then(|t| t.get_tile_properties(virtual_index))
                             .map(|p| p.collision.shape.clone());
 
-                        let (rect, response) = ui.allocate_exact_size(display_size, egui::Sense::click());
+                        let (rect, response) =
+                            ui.allocate_exact_size(display_size, egui::Sense::click());
 
                         // Draw tile texture
                         if let Some(tex_id) = texture_id {
-                            let uv_min = egui::pos2(col as f32 * uv_tile_width, row as f32 * uv_tile_height);
+                            let uv_min =
+                                egui::pos2(col as f32 * uv_tile_width, row as f32 * uv_tile_height);
                             let uv_max = egui::pos2(
                                 (col + 1) as f32 * uv_tile_width,
                                 (row + 1) as f32 * uv_tile_height,
@@ -1978,9 +2177,16 @@ fn render_collision_tile_selector(
                         }
 
                         if response.clicked() {
-                            editor_state.tileset_editor_state.collision_editor.selected_tile = Some(virtual_index);
+                            editor_state
+                                .tileset_editor_state
+                                .collision_editor
+                                .selected_tile = Some(virtual_index);
                             // Clear polygon points when selecting new tile
-                            editor_state.tileset_editor_state.collision_editor.polygon_points.clear();
+                            editor_state
+                                .tileset_editor_state
+                                .collision_editor
+                                .polygon_points
+                                .clear();
                         }
 
                         let has_collision = collision_shape
@@ -1990,7 +2196,11 @@ fn render_collision_tile_selector(
                         response.on_hover_text(format!(
                             "Tile {}\n{}",
                             virtual_index,
-                            if has_collision { "Has collision" } else { "No collision" }
+                            if has_collision {
+                                "Has collision"
+                            } else {
+                                "No collision"
+                            }
                         ));
                     }
                 });
@@ -2040,7 +2250,8 @@ fn render_collision_canvas(
     };
 
     // Allocate canvas area with click and drag sensing
-    let (canvas_rect, canvas_response) = ui.allocate_exact_size(canvas_size, egui::Sense::click_and_drag());
+    let (canvas_rect, canvas_response) =
+        ui.allocate_exact_size(canvas_size, egui::Sense::click_and_drag());
 
     // 1. Draw tile texture as background
     let texture_id = cache
@@ -2071,11 +2282,17 @@ fn render_collision_canvas(
         }
     } else {
         // Draw placeholder if no texture
-        ui.painter().rect_filled(canvas_rect, 0.0, Color32::from_gray(40));
+        ui.painter()
+            .rect_filled(canvas_rect, 0.0, Color32::from_gray(40));
     }
 
     // Draw canvas border
-    ui.painter().rect_stroke(canvas_rect, 0.0, egui::Stroke::new(1.0, Color32::from_gray(100)), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        canvas_rect,
+        0.0,
+        egui::Stroke::new(1.0, Color32::from_gray(100)),
+        egui::StrokeKind::Inside,
+    );
 
     // 2. Handle mouse interaction FIRST (before drawing shapes)
     // This ensures drag_state is set before we check it for rendering
@@ -2097,22 +2314,34 @@ fn render_collision_canvas(
 
     // 4. Draw collision shape overlay (skip if dragging vertex - preview handles it)
     let is_dragging_vertex = matches!(
-        &editor_state.tileset_editor_state.collision_editor.drag_state,
-        Some(CollisionDragState { operation: CollisionDragOperation::MoveVertex { .. }, .. })
+        &editor_state
+            .tileset_editor_state
+            .collision_editor
+            .drag_state,
+        Some(CollisionDragState {
+            operation: CollisionDragOperation::MoveVertex { .. },
+            ..
+        })
     );
     if !is_dragging_vertex {
         draw_collision_shape_on_canvas(ui.painter(), canvas_rect, &collision_data.shape);
     }
 
     // 5. Draw drag handles in select mode (skip if dragging vertex - preview handles it)
-    let drawing_mode = editor_state.tileset_editor_state.collision_editor.drawing_mode;
+    let drawing_mode = editor_state
+        .tileset_editor_state
+        .collision_editor
+        .drawing_mode;
     if drawing_mode == CollisionDrawMode::Select && !is_dragging_vertex {
         draw_collision_handles(ui.painter(), canvas_rect, &collision_data.shape);
     }
 
     // 6. Draw in-progress polygon points
     if drawing_mode == CollisionDrawMode::Polygon {
-        let polygon_points = &editor_state.tileset_editor_state.collision_editor.polygon_points;
+        let polygon_points = &editor_state
+            .tileset_editor_state
+            .collision_editor
+            .polygon_points;
         if !polygon_points.is_empty() {
             draw_polygon_in_progress(ui.painter(), canvas_rect, polygon_points);
         }
@@ -2168,10 +2397,10 @@ fn draw_collision_handles(
         bevy_map_core::CollisionShape::Rectangle { offset, size } => {
             // Draw handles at 4 corners
             let corners = [
-                [offset[0], offset[1]],                           // top-left
-                [offset[0] + size[0], offset[1]],                 // top-right
-                [offset[0], offset[1] + size[1]],                 // bottom-left
-                [offset[0] + size[0], offset[1] + size[1]],       // bottom-right
+                [offset[0], offset[1]],                     // top-left
+                [offset[0] + size[0], offset[1]],           // top-right
+                [offset[0], offset[1] + size[1]],           // bottom-left
+                [offset[0] + size[0], offset[1] + size[1]], // bottom-right
             ];
             for corner in &corners {
                 let pos = normalized_to_canvas_point(canvas_rect, corner);
@@ -2201,11 +2430,7 @@ fn draw_collision_handles(
 }
 
 /// Draw polygon points in progress
-fn draw_polygon_in_progress(
-    painter: &egui::Painter,
-    canvas_rect: egui::Rect,
-    points: &[[f32; 2]],
-) {
+fn draw_polygon_in_progress(painter: &egui::Painter, canvas_rect: egui::Rect, points: &[[f32; 2]]) {
     let point_color = Color32::from_rgb(255, 200, 0);
     let line_color = Color32::from_rgba_unmultiplied(255, 200, 0, 180);
 
@@ -2235,11 +2460,17 @@ fn handle_collision_canvas_input(
     tile_idx: u32,
 ) {
     let tileset_id = editor_state.selected_tileset.unwrap();
-    let drawing_mode = editor_state.tileset_editor_state.collision_editor.drawing_mode;
+    let drawing_mode = editor_state
+        .tileset_editor_state
+        .collision_editor
+        .drawing_mode;
 
     // Handle double-click to finish polygon (Polygon mode)
     if response.double_clicked() && drawing_mode == CollisionDrawMode::Polygon {
-        let polygon_points = &editor_state.tileset_editor_state.collision_editor.polygon_points;
+        let polygon_points = &editor_state
+            .tileset_editor_state
+            .collision_editor
+            .polygon_points;
         if polygon_points.len() >= 3 {
             // Create polygon shape
             let shape = bevy_map_core::CollisionShape::Polygon {
@@ -2249,7 +2480,11 @@ fn handle_collision_canvas_input(
                 tileset.set_tile_collision_shape(tile_idx, shape);
                 project.mark_dirty();
             }
-            editor_state.tileset_editor_state.collision_editor.polygon_points.clear();
+            editor_state
+                .tileset_editor_state
+                .collision_editor
+                .polygon_points
+                .clear();
         }
         return;
     }
@@ -2262,13 +2497,14 @@ fn handle_collision_canvas_input(
             // Only add if NOT clicking on existing vertex
             if let Some(tileset) = project.tilesets.iter_mut().find(|t| t.id == tileset_id) {
                 if let Some(props) = tileset.tile_properties.get_mut(&tile_idx) {
-                    if let bevy_map_core::CollisionShape::Polygon { points } = &mut props.collision.shape {
+                    if let bevy_map_core::CollisionShape::Polygon { points } =
+                        &mut props.collision.shape
+                    {
                         // Check if NOT on existing vertex
-                        if hit_test_polygon_vertex(canvas_rect, points, pointer_pos, 8.0).is_none() {
-                            let clamped = [
-                                normalized[0].clamp(0.0, 1.0),
-                                normalized[1].clamp(0.0, 1.0),
-                            ];
+                        if hit_test_polygon_vertex(canvas_rect, points, pointer_pos, 8.0).is_none()
+                        {
+                            let clamped =
+                                [normalized[0].clamp(0.0, 1.0), normalized[1].clamp(0.0, 1.0)];
                             let insert_idx = find_best_insertion_index(points, &clamped);
                             points.insert(insert_idx, clamped);
                             project.mark_dirty();
@@ -2296,7 +2532,10 @@ fn handle_collision_canvas_input(
                 }
                 CollisionDrawMode::Rectangle => {
                     // Start rectangle drag
-                    editor_state.tileset_editor_state.collision_editor.drag_state = Some(CollisionDragState {
+                    editor_state
+                        .tileset_editor_state
+                        .collision_editor
+                        .drag_state = Some(CollisionDragState {
                         operation: CollisionDragOperation::NewRectangle,
                         start_pos: normalized,
                         current_pos: normalized,
@@ -2304,7 +2543,10 @@ fn handle_collision_canvas_input(
                 }
                 CollisionDrawMode::Circle => {
                     // Set center and start radius drag
-                    editor_state.tileset_editor_state.collision_editor.drag_state = Some(CollisionDragState {
+                    editor_state
+                        .tileset_editor_state
+                        .collision_editor
+                        .drag_state = Some(CollisionDragState {
                         operation: CollisionDragOperation::NewCircle { center: normalized },
                         start_pos: normalized,
                         current_pos: normalized,
@@ -2326,22 +2568,23 @@ fn handle_collision_canvas_input(
             // Check if starting drag on a polygon vertex handle
             if let Some(tileset) = project.tilesets.iter().find(|t| t.id == tileset_id) {
                 if let Some(props) = tileset.get_tile_properties(tile_idx) {
-                    if let bevy_map_core::CollisionShape::Polygon { points } = &props.collision.shape {
-                        if let Some(vertex_idx) = hit_test_polygon_vertex(
-                            canvas_rect,
-                            points,
-                            pointer_pos,
-                            8.0,
-                        ) {
-                            editor_state.tileset_editor_state.collision_editor.drag_state =
-                                Some(CollisionDragState {
-                                    start_pos: normalized,
-                                    current_pos: normalized,
-                                    operation: CollisionDragOperation::MoveVertex {
-                                        index: vertex_idx,
-                                        original: points[vertex_idx],
-                                    },
-                                });
+                    if let bevy_map_core::CollisionShape::Polygon { points } =
+                        &props.collision.shape
+                    {
+                        if let Some(vertex_idx) =
+                            hit_test_polygon_vertex(canvas_rect, points, pointer_pos, 8.0)
+                        {
+                            editor_state
+                                .tileset_editor_state
+                                .collision_editor
+                                .drag_state = Some(CollisionDragState {
+                                start_pos: normalized,
+                                current_pos: normalized,
+                                operation: CollisionDragOperation::MoveVertex {
+                                    index: vertex_idx,
+                                    original: points[vertex_idx],
+                                },
+                            });
                         }
                     }
                 }
@@ -2354,7 +2597,11 @@ fn handle_collision_canvas_input(
         if let Some(pointer_pos) = ui.input(|i| i.pointer.interact_pos()) {
             let normalized = canvas_point_to_normalized(canvas_rect, pointer_pos);
 
-            if let Some(ref mut drag_state) = editor_state.tileset_editor_state.collision_editor.drag_state {
+            if let Some(ref mut drag_state) = editor_state
+                .tileset_editor_state
+                .collision_editor
+                .drag_state
+            {
                 drag_state.current_pos = normalized;
             }
         }
@@ -2362,13 +2609,26 @@ fn handle_collision_canvas_input(
 
     // Handle drag release - commit shape
     if response.drag_stopped() {
-        if let Some(drag_state) = editor_state.tileset_editor_state.collision_editor.drag_state.take() {
+        if let Some(drag_state) = editor_state
+            .tileset_editor_state
+            .collision_editor
+            .drag_state
+            .take()
+        {
             match drag_state.operation {
                 CollisionDragOperation::NewRectangle => {
-                    let min_x = drag_state.start_pos[0].min(drag_state.current_pos[0]).clamp(0.0, 1.0);
-                    let min_y = drag_state.start_pos[1].min(drag_state.current_pos[1]).clamp(0.0, 1.0);
-                    let max_x = drag_state.start_pos[0].max(drag_state.current_pos[0]).clamp(0.0, 1.0);
-                    let max_y = drag_state.start_pos[1].max(drag_state.current_pos[1]).clamp(0.0, 1.0);
+                    let min_x = drag_state.start_pos[0]
+                        .min(drag_state.current_pos[0])
+                        .clamp(0.0, 1.0);
+                    let min_y = drag_state.start_pos[1]
+                        .min(drag_state.current_pos[1])
+                        .clamp(0.0, 1.0);
+                    let max_x = drag_state.start_pos[0]
+                        .max(drag_state.current_pos[0])
+                        .clamp(0.0, 1.0);
+                    let max_y = drag_state.start_pos[1]
+                        .max(drag_state.current_pos[1])
+                        .clamp(0.0, 1.0);
 
                     let width = max_x - min_x;
                     let height = max_y - min_y;
@@ -2378,7 +2638,9 @@ fn handle_collision_canvas_input(
                             offset: [min_x, min_y],
                             size: [width, height],
                         };
-                        if let Some(tileset) = project.tilesets.iter_mut().find(|t| t.id == tileset_id) {
+                        if let Some(tileset) =
+                            project.tilesets.iter_mut().find(|t| t.id == tileset_id)
+                        {
                             tileset.set_tile_collision_shape(tile_idx, shape);
                             project.mark_dirty();
                         }
@@ -2394,7 +2656,9 @@ fn handle_collision_canvas_input(
                             offset: center,
                             radius,
                         };
-                        if let Some(tileset) = project.tilesets.iter_mut().find(|t| t.id == tileset_id) {
+                        if let Some(tileset) =
+                            project.tilesets.iter_mut().find(|t| t.id == tileset_id)
+                        {
                             tileset.set_tile_collision_shape(tile_idx, shape);
                             project.mark_dirty();
                         }
@@ -2408,9 +2672,12 @@ fn handle_collision_canvas_input(
                     ];
 
                     // Update the polygon vertex in the tileset
-                    if let Some(tileset) = project.tilesets.iter_mut().find(|t| t.id == tileset_id) {
+                    if let Some(tileset) = project.tilesets.iter_mut().find(|t| t.id == tileset_id)
+                    {
                         if let Some(props) = tileset.tile_properties.get_mut(&tile_idx) {
-                            if let bevy_map_core::CollisionShape::Polygon { points } = &mut props.collision.shape {
+                            if let bevy_map_core::CollisionShape::Polygon { points } =
+                                &mut props.collision.shape
+                            {
                                 if index < points.len() {
                                     points[index] = clamped;
                                     project.mark_dirty();
@@ -2425,7 +2692,11 @@ fn handle_collision_canvas_input(
     }
 
     // Draw preview of shape being drawn
-    if let Some(ref drag_state) = editor_state.tileset_editor_state.collision_editor.drag_state {
+    if let Some(ref drag_state) = editor_state
+        .tileset_editor_state
+        .collision_editor
+        .drag_state
+    {
         let preview_fill = Color32::from_rgba_unmultiplied(255, 200, 0, 60);
         let preview_stroke = egui::Stroke::new(2.0, Color32::from_rgb(255, 200, 0));
 
@@ -2441,7 +2712,13 @@ fn handle_collision_canvas_input(
                     &[min_x, min_y],
                     &[max_x - min_x, max_y - min_y],
                 );
-                ui.painter().rect(preview_rect, 0.0, preview_fill, preview_stroke, egui::StrokeKind::Inside);
+                ui.painter().rect(
+                    preview_rect,
+                    0.0,
+                    preview_fill,
+                    preview_stroke,
+                    egui::StrokeKind::Inside,
+                );
             }
             CollisionDragOperation::NewCircle { center } => {
                 let dx = drag_state.current_pos[0] - center[0];
@@ -2450,13 +2727,16 @@ fn handle_collision_canvas_input(
 
                 let center_pos = normalized_to_canvas_point(canvas_rect, center);
                 let r = radius * canvas_rect.width();
-                ui.painter().circle(center_pos, r, preview_fill, preview_stroke);
+                ui.painter()
+                    .circle(center_pos, r, preview_fill, preview_stroke);
             }
             CollisionDragOperation::MoveVertex { index, .. } => {
                 // Draw the polygon with the dragged vertex at its new position
                 if let Some(tileset) = project.tilesets.iter().find(|t| t.id == tileset_id) {
                     if let Some(props) = tileset.get_tile_properties(tile_idx) {
-                        if let bevy_map_core::CollisionShape::Polygon { points } = &props.collision.shape {
+                        if let bevy_map_core::CollisionShape::Polygon { points } =
+                            &props.collision.shape
+                        {
                             // Create a temporary copy with the moved vertex
                             let mut preview_points = points.clone();
                             if *index < preview_points.len() {
@@ -2467,8 +2747,14 @@ fn handle_collision_canvas_input(
                                 ];
                             }
                             // Draw the preview polygon and handles
-                            let preview_shape = bevy_map_core::CollisionShape::Polygon { points: preview_points };
-                            draw_collision_shape_on_canvas(ui.painter(), canvas_rect, &preview_shape);
+                            let preview_shape = bevy_map_core::CollisionShape::Polygon {
+                                points: preview_points,
+                            };
+                            draw_collision_shape_on_canvas(
+                                ui.painter(),
+                                canvas_rect,
+                                &preview_shape,
+                            );
                             draw_collision_handles(ui.painter(), canvas_rect, &preview_shape);
                         }
                     }
@@ -2484,26 +2770,37 @@ fn handle_collision_canvas_input(
             let normalized = canvas_point_to_normalized(canvas_rect, pointer_pos);
 
             // Check if on existing vertex
-            let vertex_idx = if let Some(tileset) = project.tilesets.iter().find(|t| t.id == tileset_id) {
-                tileset.get_tile_properties(tile_idx)
-                    .and_then(|p| {
-                        if let bevy_map_core::CollisionShape::Polygon { points } = &p.collision.shape {
-                            hit_test_polygon_vertex(canvas_rect, points, pointer_pos, 8.0)
-                        } else {
-                            None
-                        }
-                    })
+            let vertex_idx = if let Some(tileset) =
+                project.tilesets.iter().find(|t| t.id == tileset_id)
+            {
+                tileset.get_tile_properties(tile_idx).and_then(|p| {
+                    if let bevy_map_core::CollisionShape::Polygon { points } = &p.collision.shape {
+                        hit_test_polygon_vertex(canvas_rect, points, pointer_pos, 8.0)
+                    } else {
+                        None
+                    }
+                })
             } else {
                 None
             };
 
-            editor_state.tileset_editor_state.collision_editor.context_menu_pos = Some(normalized);
-            editor_state.tileset_editor_state.collision_editor.context_menu_vertex = vertex_idx;
+            editor_state
+                .tileset_editor_state
+                .collision_editor
+                .context_menu_pos = Some(normalized);
+            editor_state
+                .tileset_editor_state
+                .collision_editor
+                .context_menu_vertex = vertex_idx;
         }
     }
 
     // Render context menu if active
-    if let Some(menu_pos) = editor_state.tileset_editor_state.collision_editor.context_menu_pos {
+    if let Some(menu_pos) = editor_state
+        .tileset_editor_state
+        .collision_editor
+        .context_menu_pos
+    {
         let screen_pos = normalized_to_canvas_point(canvas_rect, &menu_pos);
         let menu_id = ui.make_persistent_id("collision_context_menu");
 
@@ -2513,38 +2810,64 @@ fn handle_collision_canvas_input(
             .show(ui.ctx(), |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
                     // Add Point Here - always available for polygons
-                    let is_polygon = project.tilesets.iter()
+                    let is_polygon = project
+                        .tilesets
+                        .iter()
                         .find(|t| t.id == tileset_id)
                         .and_then(|t| t.get_tile_properties(tile_idx))
-                        .map(|p| matches!(p.collision.shape, bevy_map_core::CollisionShape::Polygon { .. }))
+                        .map(|p| {
+                            matches!(
+                                p.collision.shape,
+                                bevy_map_core::CollisionShape::Polygon { .. }
+                            )
+                        })
                         .unwrap_or(false);
 
                     if is_polygon {
                         if ui.button("Add Point Here").clicked() {
-                            if let Some(tileset) = project.tilesets.iter_mut().find(|t| t.id == tileset_id) {
+                            if let Some(tileset) =
+                                project.tilesets.iter_mut().find(|t| t.id == tileset_id)
+                            {
                                 if let Some(props) = tileset.tile_properties.get_mut(&tile_idx) {
-                                    if let bevy_map_core::CollisionShape::Polygon { points } = &mut props.collision.shape {
+                                    if let bevy_map_core::CollisionShape::Polygon { points } =
+                                        &mut props.collision.shape
+                                    {
                                         let clamped = [
                                             menu_pos[0].clamp(0.0, 1.0),
                                             menu_pos[1].clamp(0.0, 1.0),
                                         ];
-                                        let insert_idx = find_best_insertion_index(points, &clamped);
+                                        let insert_idx =
+                                            find_best_insertion_index(points, &clamped);
                                         points.insert(insert_idx, clamped);
                                         project.mark_dirty();
                                     }
                                 }
                             }
-                            editor_state.tileset_editor_state.collision_editor.context_menu_pos = None;
-                            editor_state.tileset_editor_state.collision_editor.context_menu_vertex = None;
+                            editor_state
+                                .tileset_editor_state
+                                .collision_editor
+                                .context_menu_pos = None;
+                            editor_state
+                                .tileset_editor_state
+                                .collision_editor
+                                .context_menu_vertex = None;
                         }
 
                         // Delete Point - only if clicked on a vertex and polygon has > 3 points
-                        if let Some(vertex_idx) = editor_state.tileset_editor_state.collision_editor.context_menu_vertex {
-                            let point_count = project.tilesets.iter()
+                        if let Some(vertex_idx) = editor_state
+                            .tileset_editor_state
+                            .collision_editor
+                            .context_menu_vertex
+                        {
+                            let point_count = project
+                                .tilesets
+                                .iter()
                                 .find(|t| t.id == tileset_id)
                                 .and_then(|t| t.get_tile_properties(tile_idx))
                                 .map(|p| {
-                                    if let bevy_map_core::CollisionShape::Polygon { points } = &p.collision.shape {
+                                    if let bevy_map_core::CollisionShape::Polygon { points } =
+                                        &p.collision.shape
+                                    {
                                         points.len()
                                     } else {
                                         0
@@ -2554,9 +2877,16 @@ fn handle_collision_canvas_input(
 
                             if point_count > 3 {
                                 if ui.button("Delete Point").clicked() {
-                                    if let Some(tileset) = project.tilesets.iter_mut().find(|t| t.id == tileset_id) {
-                                        if let Some(props) = tileset.tile_properties.get_mut(&tile_idx) {
-                                            if let bevy_map_core::CollisionShape::Polygon { points } = &mut props.collision.shape {
+                                    if let Some(tileset) =
+                                        project.tilesets.iter_mut().find(|t| t.id == tileset_id)
+                                    {
+                                        if let Some(props) =
+                                            tileset.tile_properties.get_mut(&tile_idx)
+                                        {
+                                            if let bevy_map_core::CollisionShape::Polygon {
+                                                points,
+                                            } = &mut props.collision.shape
+                                            {
                                                 if vertex_idx < points.len() {
                                                     points.remove(vertex_idx);
                                                     project.mark_dirty();
@@ -2564,8 +2894,14 @@ fn handle_collision_canvas_input(
                                             }
                                         }
                                     }
-                                    editor_state.tileset_editor_state.collision_editor.context_menu_pos = None;
-                                    editor_state.tileset_editor_state.collision_editor.context_menu_vertex = None;
+                                    editor_state
+                                        .tileset_editor_state
+                                        .collision_editor
+                                        .context_menu_pos = None;
+                                    editor_state
+                                        .tileset_editor_state
+                                        .collision_editor
+                                        .context_menu_vertex = None;
                                 }
                             }
                         }
@@ -2575,8 +2911,14 @@ fn handle_collision_canvas_input(
 
         // Close menu on Escape key
         if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-            editor_state.tileset_editor_state.collision_editor.context_menu_pos = None;
-            editor_state.tileset_editor_state.collision_editor.context_menu_vertex = None;
+            editor_state
+                .tileset_editor_state
+                .collision_editor
+                .context_menu_pos = None;
+            editor_state
+                .tileset_editor_state
+                .collision_editor
+                .context_menu_vertex = None;
         }
     }
 }
@@ -2591,7 +2933,11 @@ fn render_collision_properties(
         return;
     };
 
-    let Some(tile_idx) = editor_state.tileset_editor_state.collision_editor.selected_tile else {
+    let Some(tile_idx) = editor_state
+        .tileset_editor_state
+        .collision_editor
+        .selected_tile
+    else {
         ui.label("No tile selected");
         return;
     };
@@ -2624,7 +2970,10 @@ fn render_collision_properties(
                 OneWayDirection::Right,
             ];
             for dir in directions {
-                if ui.selectable_label(one_way == dir, format!("{:?}", dir)).clicked() {
+                if ui
+                    .selectable_label(one_way == dir, format!("{:?}", dir))
+                    .clicked()
+                {
                     one_way = dir;
                 }
             }
@@ -2641,7 +2990,10 @@ fn render_collision_properties(
     let mut layer = collision_data.layer;
     ui.horizontal(|ui| {
         ui.label("Layer:");
-        if ui.add(egui::DragValue::new(&mut layer).range(0..=31)).changed() {
+        if ui
+            .add(egui::DragValue::new(&mut layer).range(0..=31))
+            .changed()
+        {
             if let Some(tileset) = project.tilesets.iter_mut().find(|t| t.id == tileset_id) {
                 tileset.set_tile_collision_layer(tile_idx, layer);
                 project.mark_dirty();

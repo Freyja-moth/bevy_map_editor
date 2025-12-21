@@ -504,8 +504,8 @@ fn handle_viewport_input(
         && editor_state.current_tool == EditorTool::Terrain
     {
         // Detect full-tile mode (Ctrl key) for preview
-        let full_tile_mode = keyboard.pressed(KeyCode::ControlLeft)
-            || keyboard.pressed(KeyCode::ControlRight);
+        let full_tile_mode =
+            keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight);
 
         // Only recalculate if we have terrain set info to compute the paint target
         if let (Some(terrain_set_id), Some(_)) = (
@@ -1153,6 +1153,22 @@ fn paint_tile(
         let base_idx = (tile_y * level.width + tile_x) as usize;
         let level_width = level.width;
 
+        // First, clean up any existing occupied_cells entries for cells we're overwriting
+        // This ensures consistent state with the sprite cleanup in render/mod.rs
+        for dy in 0..grid_height {
+            for dx in 0..grid_width {
+                let cx = tile_x + dx;
+                let cy = tile_y + dy;
+                let cell_idx = (cy * level_width + cx) as usize;
+
+                if let Some(layer) = level.layers.get_mut(layer_idx) {
+                    if let LayerData::Tiles { occupied_cells, .. } = &mut layer.data {
+                        occupied_cells.remove(&cell_idx);
+                    }
+                }
+            }
+        }
+
         for dy in 0..grid_height {
             for dx in 0..grid_width {
                 let cx = tile_x + dx;
@@ -1178,7 +1194,9 @@ fn paint_tile(
 
                 // Track for undo
                 if !stroke_tracker.changes.contains_key(&(cx, cy)) {
-                    stroke_tracker.changes.insert((cx, cy), (old_tile, new_tile));
+                    stroke_tracker
+                        .changes
+                        .insert((cx, cy), (old_tile, new_tile));
                 } else if let Some(change) = stroke_tracker.changes.get_mut(&(cx, cy)) {
                     change.1 = new_tile;
                 }
@@ -2262,7 +2280,7 @@ fn fill_terrain_rectangle(
                     level_height,
                     x,
                     y,
-                    &terrain_set,
+                    terrain_set,
                     terrain_idx,
                 );
             }
@@ -2294,7 +2312,7 @@ fn fill_terrain_rectangle(
                             level_height,
                             x,
                             y,
-                            &terrain_set,
+                            terrain_set,
                             primary_terrain,
                         );
                     }

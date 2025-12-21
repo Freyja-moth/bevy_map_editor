@@ -18,7 +18,9 @@
 use avian2d::prelude::*;
 use bevy::prelude::*;
 use bevy_map_derive::MapEntity;
-use bevy_map_runtime::{MapCollider, MapCollisionPlugin, MapEntityExt, MapHandle, MapRuntimePlugin};
+use bevy_map_runtime::{
+    MapCollider, MapCollisionPlugin, MapEntityExt, MapHandle, MapRuntimePlugin,
+};
 
 fn main() {
     App::new()
@@ -71,9 +73,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((Camera2d, Transform::from_xyz(160.0, 120.0, 0.0)));
 
     // Load map - Player entity and collisions spawn automatically!
-    commands.spawn(MapHandle(
-        asset_server.load("maps/collision_demo.map.json"),
-    ));
+    commands.spawn(MapHandle(asset_server.load("maps/collision_demo.map.json")));
 
     // Spawn info display
     commands.spawn((
@@ -176,7 +176,10 @@ fn camera_follow(
 }
 
 /// Draw collision shapes using Gizmos for debug visualization
-fn draw_collision_debug(mut gizmos: Gizmos, colliders: Query<(&Transform, &Collider, &MapCollider)>) {
+fn draw_collision_debug(
+    mut gizmos: Gizmos,
+    colliders: Query<(&Transform, &Collider, &MapCollider)>,
+) {
     for (transform, collider, map_collider) in colliders.iter() {
         let pos = transform.translation.xy();
         let color = Color::srgba(1.0, 0.3, 0.3, 0.5);
@@ -187,13 +190,21 @@ fn draw_collision_debug(mut gizmos: Gizmos, colliders: Query<(&Transform, &Colli
                 // Full tile - draw as rectangle
                 if let Some(rect) = collider.shape().as_cuboid() {
                     let half = rect.half_extents;
-                    gizmos.rect_2d(Isometry2d::from_translation(pos), Vec2::new(half.x * 2.0, half.y * 2.0), color);
+                    gizmos.rect_2d(
+                        Isometry2d::from_translation(pos),
+                        Vec2::new(half.x * 2.0, half.y * 2.0),
+                        color,
+                    );
                 }
             }
             bevy_map_core::CollisionShape::Rectangle { .. } => {
                 if let Some(rect) = collider.shape().as_cuboid() {
                     let half = rect.half_extents;
-                    gizmos.rect_2d(Isometry2d::from_translation(pos), Vec2::new(half.x * 2.0, half.y * 2.0), color);
+                    gizmos.rect_2d(
+                        Isometry2d::from_translation(pos),
+                        Vec2::new(half.x * 2.0, half.y * 2.0),
+                        color,
+                    );
                 }
             }
             bevy_map_core::CollisionShape::Circle { .. } => {
@@ -203,7 +214,11 @@ fn draw_collision_debug(mut gizmos: Gizmos, colliders: Query<(&Transform, &Colli
             }
             bevy_map_core::CollisionShape::Polygon { .. } => {
                 // For polygons, just draw a marker
-                gizmos.circle_2d(Isometry2d::from_translation(pos), 4.0, Color::srgba(0.3, 1.0, 0.3, 0.5));
+                gizmos.circle_2d(
+                    Isometry2d::from_translation(pos),
+                    4.0,
+                    Color::srgba(0.3, 1.0, 0.3, 0.5),
+                );
             }
             bevy_map_core::CollisionShape::None => {}
         }

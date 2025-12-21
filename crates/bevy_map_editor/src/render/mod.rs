@@ -292,7 +292,8 @@ fn spawn_level_tilemaps(
 
                     if grid_width > 1 || grid_height > 1 {
                         // Multi-cell tile - will be rendered as Sprite
-                        if let Some((image_index, _)) = tileset.virtual_to_local(*virtual_tile_index)
+                        if let Some((image_index, _)) =
+                            tileset.virtual_to_local(*virtual_tile_index)
                         {
                             multi_cell_tiles.push((
                                 x,
@@ -428,10 +429,18 @@ fn spawn_level_tilemaps(
             // Create a rect for the source region
             let rect = bevy::math::Rect::new(src_x, src_y, src_x + src_width, src_y + src_height);
 
-            // World position: sprite center should be at the center of all spanned cells
-            // With BottomLeft anchor, tile (x,y) starts at world (x*tile_size, y*tile_size)
-            let world_x = x as f32 * tile_size_f32 + src_width / 2.0;
-            let world_y = y as f32 * tile_size_f32 + src_height / 2.0;
+            // Get origin point (defaults to center if not set)
+            let props = tileset
+                .get_tile_properties(virtual_tile_index)
+                .cloned()
+                .unwrap_or_default();
+            let (origin_x, origin_y) = props.get_origin(src_width as u32, src_height as u32);
+
+            // World position: place sprite so origin aligns with grid cell corner
+            // For center origin (size/2): sprite center at grid + size/2 (standard behavior)
+            // For top-left origin (0): sprite center at grid + 0 (tile shifts left/down)
+            let world_x = x as f32 * tile_size_f32 + origin_x as f32;
+            let world_y = y as f32 * tile_size_f32 + origin_y as f32;
 
             // Z-offset slightly above regular tiles in same layer
             let layer_z = layer_index as f32 * 0.1 + image_index as f32 * 0.01 + 0.001;
@@ -504,15 +513,18 @@ pub fn update_tile(
     let tile_size_f32 = tile_size as f32;
     let tile_pos = TilePos { x, y };
 
-    // First, remove any existing multi-cell sprite at this position
-    let multi_cell_key = (level_id, layer_index, x, y);
-    if let Some(entity) = render_state.multi_cell_sprites.remove(&multi_cell_key) {
-        commands.entity(entity).despawn();
-    }
-
     // Skip rendering OCCUPIED_CELL sentinel values (used for multi-cell tiles)
     // Treat them as empty cells
     let effective_tile_index = new_tile_index.filter(|&idx| idx != OCCUPIED_CELL);
+
+    // Only remove existing multi-cell sprite if we're placing a real tile here
+    // (not for OCCUPIED_CELL or None, which shouldn't affect other tiles)
+    if effective_tile_index.is_some() {
+        let multi_cell_key = (level_id, layer_index, x, y);
+        if let Some(entity) = render_state.multi_cell_sprites.remove(&multi_cell_key) {
+            commands.entity(entity).despawn();
+        }
+    }
 
     if let Some(tile_idx) = effective_tile_index {
         // Check if this is a multi-cell tile
@@ -520,6 +532,9 @@ pub fn update_tile(
 
         if grid_width > 1 || grid_height > 1 {
             // Multi-cell tile - render as Sprite
+            // Note: Only remove sprite at exact same position (already handled above at lines 507-511)
+            // Overlapping tiles are preserved - no cleanup needed here
+
             if let Some((image_index, local_idx)) = tileset.virtual_to_local(tile_idx) {
                 // Remove from regular tilemap storage if it was there
                 for ((lid, li, _), storage) in render_state.tile_storages.iter_mut() {
@@ -544,14 +559,25 @@ pub fn update_tile(
                         let src_width = (grid_width * tile_size) as f32;
                         let src_height = (grid_height * tile_size) as f32;
 
-                        let rect =
-                            bevy::math::Rect::new(src_x, src_y, src_x + src_width, src_y + src_height);
+                        let rect = bevy::math::Rect::new(
+                            src_x,
+                            src_y,
+                            src_x + src_width,
+                            src_y + src_height,
+                        );
 
-                        // World position
-                        let world_x = x as f32 * tile_size_f32 + src_width / 2.0;
-                        let world_y = y as f32 * tile_size_f32 + src_height / 2.0;
-                        let layer_z =
-                            layer_index as f32 * 0.1 + image_index as f32 * 0.01 + 0.001;
+                        // Get origin point (defaults to center if not set)
+                        let props = tileset
+                            .get_tile_properties(tile_idx)
+                            .cloned()
+                            .unwrap_or_default();
+                        let (origin_x, origin_y) =
+                            props.get_origin(src_width as u32, src_height as u32);
+
+                        // World position: place sprite so origin aligns with grid cell corner
+                        let world_x = x as f32 * tile_size_f32 + origin_x as f32;
+                        let world_y = y as f32 * tile_size_f32 + origin_y as f32;
+                        let layer_z = layer_index as f32 * 0.1 + image_index as f32 * 0.01 + 0.001;
 
                         let sprite_entity = commands
                             .spawn((
@@ -595,7 +621,7 @@ pub fn update_tile(
                 }
 
                 // Create tilemap on-demand if it doesn't exist
-                if render_state.tile_storages.get(&key).is_none() {
+                if !render_state.tile_storages.contains_key(&key) {
                     // Get texture handle from cache
                     let texture_handle = tileset.images.get(image_index).and_then(|image| {
                         tileset_cache
@@ -800,8 +826,7 @@ fn sync_collision_rendering(
     let current_level = editor_state.selected_level;
 
     // Check if we need to update
-    let needs_update = show_collisions != cache.last_visible
-        || current_level != cache.last_level;
+    let needs_update = show_collisions != cache.last_visible || current_level != cache.last_level;
 
     if !needs_update && !show_collisions {
         return;
@@ -835,7 +860,10 @@ fn sync_collision_rendering(
             continue;
         }
 
-        if let bevy_map_core::LayerData::Tiles { tileset_id, tiles, .. } = &layer.data {
+        if let bevy_map_core::LayerData::Tiles {
+            tileset_id, tiles, ..
+        } = &layer.data
+        {
             // Get the tileset
             let Some(tileset) = project.tilesets.iter().find(|t| t.id == *tileset_id) else {
                 continue;
@@ -898,11 +926,7 @@ fn spawn_collision_overlay(
                         custom_size: Some(Vec2::new(tile_size, tile_size)),
                         ..default()
                     },
-                    Transform::from_xyz(
-                        base_x + tile_size / 2.0,
-                        base_y + tile_size / 2.0,
-                        z,
-                    ),
+                    Transform::from_xyz(base_x + tile_size / 2.0, base_y + tile_size / 2.0, z),
                     CollisionOverlay,
                 ))
                 .id();
@@ -1648,11 +1672,16 @@ fn sync_brush_preview(
     let preview_color = Color::srgba(1.0, 1.0, 1.0, 0.6);
     let border_color = Color::srgba(0.2, 0.8, 0.2, 0.8); // Green for brush
 
-    // Calculate world position (for multi-cell tiles, center is offset)
+    // Calculate world position using origin (consistent with tile placement)
     let total_width = grid_width as f32 * tile_size;
     let total_height = grid_height as f32 * tile_size;
-    let world_x = position.0 as f32 * tile_size + total_width / 2.0;
-    let world_y = position.1 as f32 * tile_size + total_height / 2.0;
+    let props = tileset
+        .get_tile_properties(tile_id)
+        .cloned()
+        .unwrap_or_default();
+    let (origin_x, origin_y) = props.get_origin(total_width as u32, total_height as u32);
+    let world_x = position.0 as f32 * tile_size + origin_x as f32;
+    let world_y = position.1 as f32 * tile_size + origin_y as f32;
 
     // Spawn tile sprite (try to use texture, fall back to colored rectangle)
     let mut sprite_created = false;
@@ -1760,7 +1789,11 @@ fn sync_brush_preview(
                 custom_size: Some(Vec2::new(total_width, border_thickness)),
                 ..default()
             },
-            Transform::from_xyz(world_x, world_y + half_height - border_thickness / 2.0, 181.0),
+            Transform::from_xyz(
+                world_x,
+                world_y + half_height - border_thickness / 2.0,
+                181.0,
+            ),
             BrushPreviewSprite,
         ))
         .id();
@@ -1774,7 +1807,11 @@ fn sync_brush_preview(
                 custom_size: Some(Vec2::new(total_width, border_thickness)),
                 ..default()
             },
-            Transform::from_xyz(world_x, world_y - half_height + border_thickness / 2.0, 181.0),
+            Transform::from_xyz(
+                world_x,
+                world_y - half_height + border_thickness / 2.0,
+                181.0,
+            ),
             BrushPreviewSprite,
         ))
         .id();
@@ -1788,7 +1825,11 @@ fn sync_brush_preview(
                 custom_size: Some(Vec2::new(border_thickness, total_height)),
                 ..default()
             },
-            Transform::from_xyz(world_x - half_width + border_thickness / 2.0, world_y, 181.0),
+            Transform::from_xyz(
+                world_x - half_width + border_thickness / 2.0,
+                world_y,
+                181.0,
+            ),
             BrushPreviewSprite,
         ))
         .id();
@@ -1802,7 +1843,11 @@ fn sync_brush_preview(
                 custom_size: Some(Vec2::new(border_thickness, total_height)),
                 ..default()
             },
-            Transform::from_xyz(world_x + half_width - border_thickness / 2.0, world_y, 181.0),
+            Transform::from_xyz(
+                world_x + half_width - border_thickness / 2.0,
+                world_y,
+                181.0,
+            ),
             BrushPreviewSprite,
         ))
         .id();

@@ -400,7 +400,7 @@ impl Plugin for EditorPlugin {
         editor_state.show_collisions = self.initial_state.show_collisions;
         editor_state.snap_to_grid = self.initial_state.snap_to_grid;
         editor_state.zoom = self.initial_state.initial_zoom;
-        editor_state.current_tool = self.initial_state.initial_tool.clone();
+        editor_state.current_tool = self.initial_state.initial_tool;
 
         app.add_plugins(EguiPlugin::default())
             .add_plugins(EditorUiPlugin)

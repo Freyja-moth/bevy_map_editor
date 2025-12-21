@@ -12,6 +12,7 @@ mod schema_editor;
 mod spritesheet_editor;
 mod terrain;
 mod terrain_palette;
+mod theme;
 mod tileset;
 mod tileset_editor;
 mod toolbar;
@@ -28,7 +29,10 @@ pub use spritesheet_editor::{
     render_spritesheet_editor, SpriteSheetEditorResult, SpriteSheetEditorState,
 };
 pub use terrain_palette::{render_terrain_palette, TerrainPaintState};
-pub use tileset::{render_tileset_palette, render_tileset_palette_with_cache};
+pub use theme::EditorTheme;
+pub use tileset::{
+    find_base_tile_for_position, render_tileset_palette, render_tileset_palette_with_cache,
+};
 pub use tileset_editor::{render_tileset_editor, TilesetEditorState};
 pub use toolbar::{render_toolbar, EditorTool, ToolMode};
 pub use tree_view::{render_tree_view, TreeViewResult};
@@ -378,6 +382,9 @@ fn render_ui(
     clipboard: Res<TileClipboard>,
 ) {
     let Ok(ctx) = contexts.ctx_mut() else { return };
+
+    // Apply editor theme
+    EditorTheme::apply(ctx);
 
     // Menu bar
     render_menu_bar(

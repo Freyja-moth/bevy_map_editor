@@ -3,13 +3,13 @@
 use bevy_egui::egui;
 use bevy_map_core::Tileset;
 
-use super::{ImageLoadState, TilesetTextureCache};
+use super::{EditorTheme, ImageLoadState, TilesetTextureCache};
 use crate::project::Project;
 use crate::EditorState;
 
 /// Find the base tile index if the clicked position is within a merged tile region.
 /// Returns the base tile index (top-left of merged region) or the original index if not in a merged region.
-fn find_base_tile_for_position(
+pub fn find_base_tile_for_position(
     tileset: &Tileset,
     virtual_offset: u32,
     cols: u32,
@@ -216,6 +216,9 @@ fn render_multi_image_tileset(
                             // Collect tile rects for drawing combined multi-cell borders
                             let mut tile_rects: Vec<(u32, u32, egui::Rect, u32)> = Vec::new();
 
+                            // Tighter spacing for tile grid
+                            ui.spacing_mut().item_spacing = egui::vec2(1.0, 1.0);
+
                             for row in 0..image.rows {
                                 ui.horizontal(|ui| {
                                     ui.spacing_mut().item_spacing = egui::vec2(1.0, 1.0);
@@ -246,9 +249,19 @@ fn render_multi_image_tileset(
                                                 display_size,
                                             ))
                                             .uv(egui::Rect::from_min_max(uv_min, uv_max))
-                                            .selected(selected)
+                                            .frame(false) // Remove button padding
                                             .rounding(0.0),
                                         );
+
+                                        // Draw selection border manually (doesn't obscure content)
+                                        if selected {
+                                            ui.painter().rect_stroke(
+                                                response.rect,
+                                                0.0,
+                                                egui::Stroke::new(2.0, EditorTheme::ACCENT_BLUE),
+                                                egui::StrokeKind::Inside,
+                                            );
+                                        }
 
                                         // Track rect for combined border drawing
                                         tile_rects.push((col, row, response.rect, virtual_index));
@@ -268,7 +281,11 @@ fn render_multi_image_tileset(
                                         let hover_text = if is_multi_cell {
                                             format!(
                                                 "Tile {} ({} #{}) - {}x{} cells",
-                                                virtual_index, image.name, local_index, grid_width, grid_height
+                                                virtual_index,
+                                                image.name,
+                                                local_index,
+                                                grid_width,
+                                                grid_height
                                             )
                                         } else {
                                             format!(
@@ -313,7 +330,8 @@ fn render_multi_image_tileset(
                                                 );
                                                 let uv_max = egui::pos2(
                                                     (col + props.grid_width) as f32 * uv_tile_width,
-                                                    (row + props.grid_height) as f32 * uv_tile_height,
+                                                    (row + props.grid_height) as f32
+                                                        * uv_tile_height,
                                                 );
 
                                                 ui.painter().image(
@@ -418,6 +436,9 @@ fn render_tileset_tiles(
     let uv_tile_width = 1.0 / tileset.columns.max(1) as f32;
     let uv_tile_height = 1.0 / tileset.rows.max(1) as f32;
 
+    // Tighter spacing for tile grid
+    ui.spacing_mut().item_spacing = egui::vec2(1.0, 1.0);
+
     for row in 0..tileset.rows {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing = egui::vec2(1.0, 1.0);
@@ -435,9 +456,19 @@ fn render_tileset_tiles(
                 let response = ui.add(
                     egui::ImageButton::new(egui::load::SizedTexture::new(texture_id, display_size))
                         .uv(egui::Rect::from_min_max(uv_min, uv_max))
-                        .selected(selected)
+                        .frame(false) // Remove button padding
                         .rounding(0.0),
                 );
+
+                // Draw selection border manually (doesn't obscure content)
+                if selected {
+                    ui.painter().rect_stroke(
+                        response.rect,
+                        0.0,
+                        egui::Stroke::new(2.0, EditorTheme::ACCENT_BLUE),
+                        egui::StrokeKind::Inside,
+                    );
+                }
 
                 if response.clicked() {
                     editor_state.selected_tile = Some(tile_index);

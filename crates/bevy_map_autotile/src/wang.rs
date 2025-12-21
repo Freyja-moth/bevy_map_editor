@@ -446,7 +446,9 @@ impl<'a> WangFiller<'a> {
                 } else {
                     (have - 1) as usize
                 };
-                penalty += self.terrain_set.transition_penalty(from_terrain, to_terrain);
+                penalty += self
+                    .terrain_set
+                    .transition_penalty(from_terrain, to_terrain);
             }
         }
 
@@ -1198,9 +1200,7 @@ pub fn paint_terrain_at_targets(
 
     // Create deterministic seed from first target position
     let seed = match targets[0] {
-        PaintTarget::Corner { corner_x, corner_y } => {
-            (corner_x as u64) << 32 | (corner_y as u64)
-        }
+        PaintTarget::Corner { corner_x, corner_y } => (corner_x as u64) << 32 | (corner_y as u64),
         PaintTarget::HorizontalEdge { tile_x, edge_y } => {
             (tile_x as u64) << 32 | (edge_y as u64) | 0x1000_0000_0000_0000
         }

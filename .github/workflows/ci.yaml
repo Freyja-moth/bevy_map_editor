@@ -33,7 +33,7 @@ jobs:
       - name: Install Dependencies
         run: sudo apt-get update; sudo apt-get install --no-install-recommends libasound2-dev libudev-dev libwayland-dev
       - name: Run cargo test
-        run: cargo test
+        run: cargo test --workspace --lib --all-features
 
   # Run cargo clippy -- -D warnings
   clippy_check:
@@ -60,7 +60,7 @@ jobs:
       - name: Install Dependencies
         run: sudo apt-get update; sudo apt-get install --no-install-recommends libasound2-dev libudev-dev libwayland-dev
       - name: Run clippy
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --workspace --lib --all-features -- -D warnings
 
   # Run cargo fmt --all -- --check
   format:

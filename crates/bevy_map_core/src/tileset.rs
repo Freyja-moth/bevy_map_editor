@@ -26,6 +26,12 @@ pub struct TileProperties {
     /// Height in grid cells (for multi-cell tiles like trees)
     #[serde(default = "default_one", skip_serializing_if = "is_one")]
     pub grid_height: u32,
+    /// Origin X offset in pixels from top-left. None = auto-center.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_x: Option<u32>,
+    /// Origin Y offset in pixels from top-left. None = auto-center.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_y: Option<u32>,
 }
 
 /// Default value of 1 for grid dimensions
@@ -134,6 +140,8 @@ impl TileProperties {
             && self.custom.is_empty()
             && self.grid_width == 1
             && self.grid_height == 1
+            && self.origin_x.is_none()
+            && self.origin_y.is_none()
     }
 
     /// Check if this is a multi-cell tile (spans more than 1x1 grid cells)
@@ -150,6 +158,21 @@ impl TileProperties {
     pub fn with_grid_size(mut self, width: u32, height: u32) -> Self {
         self.grid_width = width.max(1);
         self.grid_height = height.max(1);
+        self
+    }
+
+    /// Get origin in pixels from top-left of tile.
+    /// If not set, returns center of the tile.
+    pub fn get_origin(&self, tile_width: u32, tile_height: u32) -> (u32, u32) {
+        let x = self.origin_x.unwrap_or(tile_width / 2);
+        let y = self.origin_y.unwrap_or(tile_height / 2);
+        (x, y)
+    }
+
+    /// Set the origin point for the tile
+    pub fn with_origin(mut self, x: Option<u32>, y: Option<u32>) -> Self {
+        self.origin_x = x;
+        self.origin_y = y;
         self
     }
 }
@@ -266,9 +289,7 @@ impl Tileset {
 
     /// Get collision data for a tile
     pub fn get_tile_collision(&self, tile_index: u32) -> Option<&CollisionData> {
-        self.tile_properties
-            .get(&tile_index)
-            .map(|p| &p.collision)
+        self.tile_properties.get(&tile_index).map(|p| &p.collision)
     }
 
     /// Set collision data for a tile

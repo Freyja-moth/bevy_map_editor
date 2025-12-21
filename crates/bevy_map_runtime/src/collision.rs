@@ -85,7 +85,7 @@ pub fn spawn_tile_colliders(
         let level = &project.level;
 
         // Iterate through all tile layers
-        for (_layer_index, layer) in level.layers.iter().enumerate() {
+        for layer in level.layers.iter() {
             if let bevy_map_core::LayerData::Tiles {
                 tileset_id, tiles, ..
             } = &layer.data
@@ -178,9 +178,10 @@ fn shape_to_collider(shape: &CollisionShape, tile_size: f32) -> Option<Collider>
     match shape {
         CollisionShape::None => None,
         CollisionShape::Full => Some(Collider::rectangle(tile_size, tile_size)),
-        CollisionShape::Rectangle { size, .. } => {
-            Some(Collider::rectangle(size[0] * tile_size, size[1] * tile_size))
-        }
+        CollisionShape::Rectangle { size, .. } => Some(Collider::rectangle(
+            size[0] * tile_size,
+            size[1] * tile_size,
+        )),
         CollisionShape::Circle { radius, .. } => Some(Collider::circle(*radius * tile_size)),
         CollisionShape::Polygon { points } => {
             if points.len() < 3 {
@@ -199,9 +200,7 @@ fn shape_to_collider(shape: &CollisionShape, tile_size: f32) -> Option<Collider>
 #[cfg(feature = "physics")]
 fn get_shape_offset(shape: &CollisionShape, tile_size: f32) -> (f32, f32) {
     match shape {
-        CollisionShape::Rectangle { offset, .. } => {
-            (offset[0] * tile_size, offset[1] * tile_size)
-        }
+        CollisionShape::Rectangle { offset, .. } => (offset[0] * tile_size, offset[1] * tile_size),
         CollisionShape::Circle { offset, .. } => (offset[0] * tile_size, offset[1] * tile_size),
         _ => (0.0, 0.0),
     }

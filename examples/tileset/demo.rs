@@ -184,7 +184,10 @@ fn update_display(
 
     // Show tile info at cursor
     for layer in &project.level.layers {
-        if let LayerData::Tiles { tileset_id, tiles, .. } = &layer.data {
+        if let LayerData::Tiles {
+            tileset_id, tiles, ..
+        } = &layer.data
+        {
             let idx =
                 (project.level.height - 1 - y) as usize * project.level.width as usize + x as usize;
             if let Some(tile_idx) = tiles.get(idx).and_then(|t| *t) {
@@ -196,7 +199,8 @@ fn update_display(
                             display.push_str("  [COLLISION]\n");
                         }
                         if props.collision.one_way != OneWayDirection::None {
-                            display.push_str(&format!("  [ONE-WAY: {:?}]\n", props.collision.one_way));
+                            display
+                                .push_str(&format!("  [ONE-WAY: {:?}]\n", props.collision.one_way));
                         }
                         for (key, value) in &props.custom {
                             display.push_str(&format!("  {}: {}\n", key, value));
