@@ -3,6 +3,7 @@
 //! This module provides all the UI panels, dialogs, and widgets for the editor.
 
 mod animation_editor;
+mod asset_browser;
 mod dialogs;
 mod dialogue_editor;
 mod entity_palette;
@@ -21,6 +22,7 @@ mod toolbar;
 mod tree_view;
 
 pub use animation_editor::{render_animation_editor, AnimationEditorResult, AnimationEditorState};
+pub use asset_browser::{render_asset_browser, AssetBrowserResult, AssetBrowserState};
 pub use dialogs::*;
 pub use dialogue_editor::{render_dialogue_editor, DialogueEditorResult, DialogueEditorState};
 pub use entity_palette::{render_entity_palette, EntityPaintState};
@@ -125,8 +127,11 @@ impl Plugin for EditorUiPlugin {
 pub struct UiState {
     pub show_tree_view: bool,
     pub show_inspector: bool,
+    pub show_asset_browser: bool,
     pub tree_view_width: f32,
     pub inspector_width: f32,
+    pub asset_browser_height: f32,
+    pub asset_browser_state: AssetBrowserState,
 }
 
 impl Default for UiState {
@@ -134,8 +139,11 @@ impl Default for UiState {
         Self {
             show_tree_view: true,
             show_inspector: true,
+            show_asset_browser: false,
             tree_view_width: 200.0,
             inspector_width: 250.0,
+            asset_browser_height: 200.0,
+            asset_browser_state: AssetBrowserState::default(),
         }
     }
 }
@@ -1084,6 +1092,19 @@ fn render_ui(
             project.add_dialogue(duplicate);
             editor_state.selection = Selection::Dialogue(new_id);
         }
+    }
+
+    // Bottom panel - Asset Browser
+    if ui_state.show_asset_browser {
+        egui::TopBottomPanel::bottom("asset_browser")
+            .resizable(true)
+            .default_height(ui_state.asset_browser_height)
+            .min_height(100.0)
+            .show(ctx, |ui| {
+                ui_state.asset_browser_height = ui.available_height();
+                let _result = render_asset_browser(ui, &mut ui_state.asset_browser_state);
+                // TODO: Handle result.file_activated for import actions
+            });
     }
 
     // Central area - transparent to allow Bevy rendering to show through

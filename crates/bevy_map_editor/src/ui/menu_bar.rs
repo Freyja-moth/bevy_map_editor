@@ -132,6 +132,12 @@ pub fn render_menu_bar(
                 {
                     ui.close();
                 }
+                if ui
+                    .checkbox(&mut ui_state.show_asset_browser, "Asset Browser")
+                    .clicked()
+                {
+                    ui.close();
+                }
                 ui.separator();
                 if ui
                     .checkbox(&mut editor_state.show_grid, "Show Grid")
