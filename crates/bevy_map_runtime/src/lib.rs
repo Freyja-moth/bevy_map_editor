@@ -143,11 +143,11 @@ pub use entity_input::{
     TwinStickInput,
 };
 pub use entity_physics::{EntityPhysicsSpawned, MapEntityPhysicsPlugin};
-pub use entity_sprite::{EntitySpriteSetup, EntitySpriteSpawned, MapEntitySpritePlugin};
 pub use entity_registry::{
     attach_dialogues, Dialogue, EntityProperties, EntityRegistry, MapEntityExt, MapEntityMarker,
     MapEntityType,
 };
+pub use entity_sprite::{EntitySpriteSetup, EntitySpriteSpawned, MapEntitySpritePlugin};
 pub use loader::{MapLoadError, MapProjectLoader};
 pub use render::{complete_sprite_loads, spawn_sprite_components, SpriteSlot};
 

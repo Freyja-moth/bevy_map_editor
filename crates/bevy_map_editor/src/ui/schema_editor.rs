@@ -744,8 +744,10 @@ fn render_components_section(
     type_name: &str,
 ) {
     ui.label(
-        egui::RichText::new("Configure automatic components for all instances of this entity type.")
-            .weak(),
+        egui::RichText::new(
+            "Configure automatic components for all instances of this entity type.",
+        )
+        .weak(),
     );
     ui.add_space(8.0);
 
@@ -755,7 +757,8 @@ fn render_components_section(
     // Physics section
     let mut physics_enabled = config.physics.is_some();
     let mut physics_config = config.physics.clone().unwrap_or_default();
-    let physics_changed = render_physics_config(ui, type_name, &mut physics_enabled, &mut physics_config);
+    let physics_changed =
+        render_physics_config(ui, type_name, &mut physics_enabled, &mut physics_config);
 
     // Input section
     let mut input_enabled = config.input.is_some();
@@ -765,14 +768,32 @@ fn render_components_section(
     // Sprite section
     let mut sprite_enabled = config.sprite.is_some();
     let mut sprite_config = config.sprite.clone().unwrap_or_default();
-    let sprite_changed = render_sprite_config(ui, project, type_name, &mut sprite_enabled, &mut sprite_config);
+    let sprite_changed = render_sprite_config(
+        ui,
+        project,
+        type_name,
+        &mut sprite_enabled,
+        &mut sprite_config,
+    );
 
     // Apply changes
     if physics_changed || input_changed || sprite_changed {
         let type_config = project.ensure_entity_type_config(type_name);
-        type_config.physics = if physics_enabled { Some(physics_config) } else { None };
-        type_config.input = if input_enabled { Some(input_config) } else { None };
-        type_config.sprite = if sprite_enabled { Some(sprite_config) } else { None };
+        type_config.physics = if physics_enabled {
+            Some(physics_config)
+        } else {
+            None
+        };
+        type_config.input = if input_enabled {
+            Some(input_config)
+        } else {
+            None
+        };
+        type_config.sprite = if sprite_enabled {
+            Some(sprite_config)
+        } else {
+            None
+        };
         project.mark_dirty();
     }
 }
@@ -831,7 +852,9 @@ fn render_physics_config(
                             .show_ui(ui, |ui| {
                                 for name in collider_names {
                                     let is_selected = config.collider.display_name() == name;
-                                    if ui.selectable_label(is_selected, name).clicked() && !is_selected {
+                                    if ui.selectable_label(is_selected, name).clicked()
+                                        && !is_selected
+                                    {
                                         config.collider = match name {
                                             "Box" => ColliderConfig::new_box(16.0, 16.0),
                                             "Capsule" => ColliderConfig::new_capsule(14.0, 24.0),
@@ -848,31 +871,66 @@ fn render_physics_config(
                         match &mut config.collider {
                             ColliderConfig::Box { width, height } => {
                                 ui.label("Width:");
-                                if ui.add(egui::DragValue::new(width).range(1.0..=256.0).suffix(" px")).changed() {
+                                if ui
+                                    .add(
+                                        egui::DragValue::new(width)
+                                            .range(1.0..=256.0)
+                                            .suffix(" px"),
+                                    )
+                                    .changed()
+                                {
                                     changed = true;
                                 }
                                 ui.end_row();
                                 ui.label("Height:");
-                                if ui.add(egui::DragValue::new(height).range(1.0..=256.0).suffix(" px")).changed() {
+                                if ui
+                                    .add(
+                                        egui::DragValue::new(height)
+                                            .range(1.0..=256.0)
+                                            .suffix(" px"),
+                                    )
+                                    .changed()
+                                {
                                     changed = true;
                                 }
                                 ui.end_row();
                             }
                             ColliderConfig::Capsule { width, height } => {
                                 ui.label("Width:");
-                                if ui.add(egui::DragValue::new(width).range(1.0..=256.0).suffix(" px")).changed() {
+                                if ui
+                                    .add(
+                                        egui::DragValue::new(width)
+                                            .range(1.0..=256.0)
+                                            .suffix(" px"),
+                                    )
+                                    .changed()
+                                {
                                     changed = true;
                                 }
                                 ui.end_row();
                                 ui.label("Height:");
-                                if ui.add(egui::DragValue::new(height).range(1.0..=256.0).suffix(" px")).changed() {
+                                if ui
+                                    .add(
+                                        egui::DragValue::new(height)
+                                            .range(1.0..=256.0)
+                                            .suffix(" px"),
+                                    )
+                                    .changed()
+                                {
                                     changed = true;
                                 }
                                 ui.end_row();
                             }
                             ColliderConfig::Circle { radius } => {
                                 ui.label("Radius:");
-                                if ui.add(egui::DragValue::new(radius).range(1.0..=128.0).suffix(" px")).changed() {
+                                if ui
+                                    .add(
+                                        egui::DragValue::new(radius)
+                                            .range(1.0..=128.0)
+                                            .suffix(" px"),
+                                    )
+                                    .changed()
+                                {
                                     changed = true;
                                 }
                                 ui.end_row();
@@ -881,7 +939,14 @@ fn render_physics_config(
 
                         // Gravity Scale
                         ui.label("Gravity Scale:");
-                        if ui.add(egui::DragValue::new(&mut config.gravity_scale).range(0.0..=10.0).speed(0.1)).changed() {
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut config.gravity_scale)
+                                    .range(0.0..=10.0)
+                                    .speed(0.1),
+                            )
+                            .changed()
+                        {
                             changed = true;
                         }
                         ui.end_row();
@@ -895,14 +960,28 @@ fn render_physics_config(
 
                         // Friction
                         ui.label("Friction:");
-                        if ui.add(egui::DragValue::new(&mut config.friction).range(0.0..=1.0).speed(0.05)).changed() {
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut config.friction)
+                                    .range(0.0..=1.0)
+                                    .speed(0.05),
+                            )
+                            .changed()
+                        {
                             changed = true;
                         }
                         ui.end_row();
 
                         // Restitution (bounciness)
                         ui.label("Restitution:");
-                        if ui.add(egui::DragValue::new(&mut config.restitution).range(0.0..=1.0).speed(0.05)).changed() {
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut config.restitution)
+                                    .range(0.0..=1.0)
+                                    .speed(0.05),
+                            )
+                            .changed()
+                        {
                             changed = true;
                         }
                         ui.end_row();
@@ -961,7 +1040,14 @@ fn render_input_config(
 
                         // Speed
                         ui.label("Speed:");
-                        if ui.add(egui::DragValue::new(&mut config.speed).range(0.0..=1000.0).suffix(" px/s")).changed() {
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut config.speed)
+                                    .range(0.0..=1000.0)
+                                    .suffix(" px/s"),
+                            )
+                            .changed()
+                        {
                             changed = true;
                         }
                         ui.end_row();
@@ -970,7 +1056,10 @@ fn render_input_config(
                         if matches!(config.profile, InputProfile::Platformer) {
                             ui.label("Jump Force:");
                             let mut jump = config.jump_force.unwrap_or(400.0);
-                            if ui.add(egui::DragValue::new(&mut jump).range(0.0..=2000.0)).changed() {
+                            if ui
+                                .add(egui::DragValue::new(&mut jump).range(0.0..=2000.0))
+                                .changed()
+                            {
                                 config.jump_force = Some(jump);
                                 changed = true;
                             }
@@ -978,7 +1067,10 @@ fn render_input_config(
 
                             ui.label("Max Fall Speed:");
                             let mut fall = config.max_fall_speed.unwrap_or(600.0);
-                            if ui.add(egui::DragValue::new(&mut fall).range(0.0..=2000.0)).changed() {
+                            if ui
+                                .add(egui::DragValue::new(&mut fall).range(0.0..=2000.0))
+                                .changed()
+                            {
                                 config.max_fall_speed = Some(fall);
                                 changed = true;
                             }
@@ -1029,7 +1121,10 @@ fn render_sprite_config(
                             .selected_text(&selected_name)
                             .show_ui(ui, |ui| {
                                 // None option
-                                if ui.selectable_label(config.sprite_sheet_id.is_none(), "(none)").clicked() {
+                                if ui
+                                    .selectable_label(config.sprite_sheet_id.is_none(), "(none)")
+                                    .clicked()
+                                {
                                     config.sprite_sheet_id = None;
                                     config.default_animation = None;
                                     changed = true;
@@ -1037,11 +1132,16 @@ fn render_sprite_config(
 
                                 // List sprite sheets
                                 for sprite_sheet in &project.sprite_sheets {
-                                    let is_selected = config.sprite_sheet_id == Some(sprite_sheet.id);
-                                    if ui.selectable_label(is_selected, &sprite_sheet.name).clicked() {
+                                    let is_selected =
+                                        config.sprite_sheet_id == Some(sprite_sheet.id);
+                                    if ui
+                                        .selectable_label(is_selected, &sprite_sheet.name)
+                                        .clicked()
+                                    {
                                         config.sprite_sheet_id = Some(sprite_sheet.id);
                                         // Reset animation when sheet changes
-                                        config.default_animation = sprite_sheet.animations.keys().next().cloned();
+                                        config.default_animation =
+                                            sprite_sheet.animations.keys().next().cloned();
                                         changed = true;
                                     }
                                 }
@@ -1052,14 +1152,19 @@ fn render_sprite_config(
                         if let Some(sheet_id) = config.sprite_sheet_id {
                             if let Some(sprite_sheet) = project.get_sprite_sheet(sheet_id) {
                                 ui.label("Default Animation:");
-                                let selected_anim = config.default_animation.clone().unwrap_or_else(|| "(none)".to_string());
+                                let selected_anim = config
+                                    .default_animation
+                                    .clone()
+                                    .unwrap_or_else(|| "(none)".to_string());
 
                                 egui::ComboBox::from_id_salt(format!("sprite_anim_{}", type_name))
                                     .selected_text(&selected_anim)
                                     .show_ui(ui, |ui| {
                                         for anim_name in sprite_sheet.animations.keys() {
-                                            let is_selected = config.default_animation.as_ref() == Some(anim_name);
-                                            if ui.selectable_label(is_selected, anim_name).clicked() {
+                                            let is_selected = config.default_animation.as_ref()
+                                                == Some(anim_name);
+                                            if ui.selectable_label(is_selected, anim_name).clicked()
+                                            {
                                                 config.default_animation = Some(anim_name.clone());
                                                 changed = true;
                                             }
@@ -1072,8 +1177,19 @@ fn render_sprite_config(
                         // Scale
                         ui.label("Scale:");
                         let mut scale = config.scale.unwrap_or(1.0);
-                        if ui.add(egui::DragValue::new(&mut scale).range(0.1..=10.0).speed(0.1)).changed() {
-                            config.scale = if (scale - 1.0).abs() < 0.01 { None } else { Some(scale) };
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut scale)
+                                    .range(0.1..=10.0)
+                                    .speed(0.1),
+                            )
+                            .changed()
+                        {
+                            config.scale = if (scale - 1.0).abs() < 0.01 {
+                                None
+                            } else {
+                                Some(scale)
+                            };
                             changed = true;
                         }
                         ui.end_row();

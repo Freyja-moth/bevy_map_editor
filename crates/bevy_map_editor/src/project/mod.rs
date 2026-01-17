@@ -182,7 +182,8 @@ impl Project {
 
     /// Set entity type config for a type
     pub fn set_entity_type_config(&mut self, type_name: &str, config: EntityTypeConfig) {
-        self.entity_type_configs.insert(type_name.to_string(), config);
+        self.entity_type_configs
+            .insert(type_name.to_string(), config);
         self.dirty = true;
     }
 

@@ -26,9 +26,9 @@
 //! For custom input profiles, the plugin adds a marker component. You can then
 //! implement your own input systems that query for that component.
 
-use bevy::prelude::*;
 use crate::entity_registry::MapEntityMarker;
 use crate::MapRoot;
+use bevy::prelude::*;
 use bevy_map_core::{InputConfig, InputProfile, MapProject};
 
 /// Plugin that spawns input components on entities based on EntityTypeConfig
@@ -56,8 +56,9 @@ impl Plugin for MapEntityInputPlugin {
             // (input requires velocity components from physics)
             .add_systems(
                 Update,
-                (platformer_input_system, top_down_input_system)
-                    .run_if(any_with_component::<PlatformerInput>.or(any_with_component::<TopDownInput>)),
+                (platformer_input_system, top_down_input_system).run_if(
+                    any_with_component::<PlatformerInput>.or(any_with_component::<TopDownInput>),
+                ),
             );
     }
 }
@@ -154,7 +155,9 @@ fn spawn_entity_input(
     map_assets: Res<Assets<MapProject>>,
 ) {
     // Try to get the first available map project
-    let project = map_root_query.iter().find_map(|root| map_assets.get(&root.handle));
+    let project = map_root_query
+        .iter()
+        .find_map(|root| map_assets.get(&root.handle));
 
     let Some(project) = project else {
         return;

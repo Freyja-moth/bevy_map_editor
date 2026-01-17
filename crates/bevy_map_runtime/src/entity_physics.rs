@@ -91,7 +91,9 @@ fn spawn_entity_physics(
     map_assets: Res<Assets<MapProject>>,
 ) {
     // Try to get the first available map project
-    let project = map_root_query.iter().find_map(|root| map_assets.get(&root.handle));
+    let project = map_root_query
+        .iter()
+        .find_map(|root| map_assets.get(&root.handle));
 
     let Some(project) = project else {
         return;

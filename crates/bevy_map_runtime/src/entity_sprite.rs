@@ -22,11 +22,11 @@
 //! 2. If a `SpriteConfig` is defined with a sprite_sheet_id, loads and spawns the sprite
 //! 3. If animations are defined, auto-plays the default animation
 
+use crate::entity_registry::MapEntityMarker;
+use crate::MapRoot;
 use bevy::prelude::*;
 use bevy_map_animation::{AnimatedSprite, SpriteData};
 use bevy_map_core::{MapProject, SpriteConfig};
-use crate::entity_registry::MapEntityMarker;
-use crate::MapRoot;
 
 /// Plugin that spawns sprite components on entities based on EntityTypeConfig
 ///
@@ -48,7 +48,10 @@ pub struct MapEntitySpritePlugin;
 
 impl Plugin for MapEntitySpritePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (spawn_entity_sprites, complete_entity_sprite_loads).chain());
+        app.add_systems(
+            Update,
+            (spawn_entity_sprites, complete_entity_sprite_loads).chain(),
+        );
     }
 }
 
@@ -77,13 +80,19 @@ fn spawn_entity_sprites(
     asset_server: Res<AssetServer>,
     entity_query: Query<
         (Entity, &MapEntityMarker),
-        (Added<MapEntityMarker>, Without<EntitySpriteSetup>, Without<EntitySpriteSpawned>),
+        (
+            Added<MapEntityMarker>,
+            Without<EntitySpriteSetup>,
+            Without<EntitySpriteSpawned>,
+        ),
     >,
     map_root_query: Query<&MapRoot>,
     map_assets: Res<Assets<MapProject>>,
 ) {
     // Try to get the first available map project
-    let project = map_root_query.iter().find_map(|root| map_assets.get(&root.handle));
+    let project = map_root_query
+        .iter()
+        .find_map(|root| map_assets.get(&root.handle));
 
     let Some(project) = project else {
         return;
@@ -175,7 +184,9 @@ fn complete_entity_sprite_loads(
     use bevy::asset::LoadState;
 
     // Try to get the first available map project
-    let project = map_root_query.iter().find_map(|root| map_assets.get(&root.handle));
+    let project = map_root_query
+        .iter()
+        .find_map(|root| map_assets.get(&root.handle));
 
     let Some(project) = project else {
         return;
@@ -223,7 +234,10 @@ fn complete_entity_sprite_loads(
 
         // Mark as complete
         commands.entity(entity).insert(EntitySpriteSpawned);
-        info!("Completed sprite setup for entity with sheet {}", sprite_data.name);
+        info!(
+            "Completed sprite setup for entity with sheet {}",
+            sprite_data.name
+        );
     }
 }
 
@@ -303,6 +317,9 @@ mod tests {
             normalize_asset_path("assets/sprites/player.png"),
             "sprites/player.png"
         );
-        assert_eq!(normalize_asset_path("sprites/player.png"), "sprites/player.png");
+        assert_eq!(
+            normalize_asset_path("sprites/player.png"),
+            "sprites/player.png"
+        );
     }
 }
