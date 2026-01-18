@@ -185,7 +185,7 @@ pub fn launch_game(options: &LaunchOptions) -> LaunchResult {
     }
 
     if options.hot_reload {
-        cmd.args(["--features", "dev"]);
+        cmd.args(["--features", "hot_reload"]);
     }
 
     // Don't capture output - let it go to console
