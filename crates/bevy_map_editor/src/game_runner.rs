@@ -134,31 +134,7 @@ pub struct LaunchOptions {
     pub hot_reload: bool,
 }
 
-/// Result of a game launch attempt
-pub struct LaunchResult {
-    /// The spawned child process (if successful)
-    pub child: Option<Child>,
-    /// Error if launch failed
-    pub error: Option<LaunchError>,
-}
-
-impl LaunchResult {
-    /// Create a successful launch result
-    pub fn success(child: Child) -> Self {
-        Self {
-            child: Some(child),
-            error: None,
-        }
-    }
-
-    /// Create a failed launch result
-    pub fn failure(error: LaunchError) -> Self {
-        Self {
-            child: None,
-            error: Some(error),
-        }
-    }
-}
+pub type LaunchResult = Result<Child, LaunchError>;
 
 /// Launch a game project
 ///
@@ -168,11 +144,11 @@ impl LaunchResult {
 pub fn launch_game(options: &LaunchOptions) -> LaunchResult {
     // Verify project exists
     if !options.project_path.exists() {
-        return LaunchResult::failure(LaunchError::ProjectNotFound(options.project_path.clone()));
+        return Err(LaunchError::ProjectNotFound(options.project_path.clone()));
     }
 
     if !options.project_path.join("Cargo.toml").exists() {
-        return LaunchResult::failure(LaunchError::ProjectNotFound(options.project_path.clone()));
+        return Err(LaunchError::ProjectNotFound(options.project_path.clone()));
     }
 
     // Build cargo command
@@ -194,8 +170,8 @@ pub fn launch_game(options: &LaunchOptions) -> LaunchResult {
 
     // Spawn the process
     match cmd.spawn() {
-        Ok(child) => LaunchResult::success(child),
-        Err(e) => LaunchResult::failure(LaunchError::LaunchFailed(e.to_string())),
+        Ok(child) => Ok(child),
+        Err(e) => Err(LaunchError::LaunchFailed(e.to_string())),
     }
 }
 
