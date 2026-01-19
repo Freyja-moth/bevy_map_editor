@@ -1217,10 +1217,7 @@ fn render_ui(
     if game_settings_result.install_cli_requested {
         editor_state.pending_action = Some(PendingAction::InstallBevyCli);
     }
-    if game_settings_result.create_level_requested {
-        editor_state.show_new_level_dialog = true;
-        println!("Opening new level dialogue");
-    }
+    editor_state.show_new_level_dialog = game_settings_result.create_level_requested;
 
     // Build progress dialog (shown during game build)
     let build_progress_result = render_build_progress(ctx, &mut editor_state);
