@@ -130,7 +130,7 @@ pub struct LaunchOptions {
     pub project_path: PathBuf,
     /// Whether to use release mode
     pub release: bool,
-    /// Whether to enable hot-reload (adds 'dev' feature)
+    /// Whether to enable hot-reload (adds 'hot_reload' feature)
     pub hot_reload: bool,
 }
 
@@ -140,7 +140,7 @@ pub type LaunchResult = Result<Child, LaunchError>;
 ///
 /// Runs `cargo run` in the game project directory with optional flags:
 /// - `--release` if release mode is enabled
-/// - `--features dev` if hot-reload is enabled
+/// - `--features hot_reload` if hot-reload is enabled
 pub fn launch_game(options: &LaunchOptions) -> LaunchResult {
     // Verify project exists
     if !options.project_path.exists() {
@@ -161,7 +161,7 @@ pub fn launch_game(options: &LaunchOptions) -> LaunchResult {
     }
 
     if options.hot_reload {
-        cmd.args(["--features", "dev"]);
+        cmd.args(["--features", "hot_reload"]);
     }
 
     // Don't capture output - let it go to console
@@ -414,7 +414,7 @@ fn run_build_thread(options: LaunchOptions, tx: Sender<BuildOutput>, cancel_rx: 
     }
 
     if options.hot_reload {
-        cmd.args(["--features", "dev"]);
+        cmd.args(["--features", "hot_reload"]);
     }
 
     // Force cargo to show progress even when piped
